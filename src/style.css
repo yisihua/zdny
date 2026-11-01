@@ -1,0 +1,29 @@
+:root {
+  --el-color-primary: #1f7a4d;
+  --el-color-primary-light-3: #5ca27a;
+  --el-color-primary-light-5: #8fbfa6;
+  --el-color-primary-light-7: #c3ddd0;
+  --el-color-primary-light-8: #d8ebe2;
+  --el-color-primary-light-9: #eef6f2;
+  --el-color-primary-dark-2: #19623e;
+  --agri-bg: #f3f6f4;
+  --agri-text: #1f2a24;
+  --agri-sidebar: #12382c;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--agri-text);
+  background: var(--agri-bg);
+}
+
+* {
+  box-sizing: border-box;
+}
