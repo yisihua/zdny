@@ -23,6 +23,21 @@ const docs = {
   },
 }
 
+const motes = [
+  { left: '6%', size: '2px', delay: '0s', duration: '13s' },
+  { left: '14%', size: '3px', delay: '2.4s', duration: '16s' },
+  { left: '23%', size: '2px', delay: '5s', duration: '12s' },
+  { left: '31%', size: '2px', delay: '1.2s', duration: '18s' },
+  { left: '42%', size: '3px', delay: '7s', duration: '15s' },
+  { left: '51%', size: '2px', delay: '3.6s', duration: '14s' },
+  { left: '63%', size: '2px', delay: '8.2s', duration: '17s' },
+  { left: '71%', size: '3px', delay: '0.8s', duration: '13s' },
+  { left: '79%', size: '2px', delay: '4.5s', duration: '16s' },
+  { left: '88%', size: '2px', delay: '6.1s', duration: '12s' },
+  { left: '94%', size: '3px', delay: '9s', duration: '15s' },
+  { left: '37%', size: '2px', delay: '10s', duration: '19s' },
+]
+
 const form = reactive({
   username: localStorage.getItem('username') || '',
   password: '',
@@ -96,6 +111,21 @@ createCaptcha()
 <template>
   <div class="login-page">
     <div class="veil"></div>
+    <div class="aurora" aria-hidden="true"></div>
+    <div class="grid" aria-hidden="true"></div>
+    <span
+      v-for="(mote, index) in motes"
+      :key="index"
+      class="mote"
+      :style="{
+        left: mote.left,
+        width: mote.size,
+        height: mote.size,
+        animationDelay: mote.delay,
+        animationDuration: mote.duration,
+      }"
+      aria-hidden="true"
+    ></span>
 
     <header class="brand">
       <span class="brand-logo" aria-hidden="true">
@@ -206,13 +236,49 @@ createCaptcha()
   background: #04140f url('/login/bg.jpg') 18% center / cover no-repeat;
 }
 
-.veil {
+.veil,
+.aurora,
+.grid,
+.mote {
   position: absolute;
+  pointer-events: none;
+}
+
+.veil {
   inset: 0;
   background:
     linear-gradient(90deg, rgba(3, 18, 12, 0.05) 0%, rgba(3, 16, 12, 0.12) 42%, rgba(2, 14, 10, 0.34) 100%),
     linear-gradient(180deg, rgba(3, 16, 12, 0.18), transparent 18%, transparent 78%, rgba(2, 12, 9, 0.35));
-  pointer-events: none;
+}
+
+.aurora {
+  top: 12%;
+  left: 4%;
+  width: 46vw;
+  height: 46vw;
+  background: radial-gradient(circle, rgba(48, 210, 130, 0.28), transparent 68%);
+  filter: blur(6px);
+  animation: drift 14s ease-in-out infinite;
+}
+
+.grid {
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(150, 235, 190, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(150, 235, 190, 0.08) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 62% 48%, #000 8%, transparent 72%);
+  animation: grid-shift 18s linear infinite;
+}
+
+.mote {
+  bottom: -8px;
+  border-radius: 50%;
+  background: #d8ffe9;
+  box-shadow: 0 0 8px rgba(125, 255, 195, 0.85);
+  animation-name: rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
 }
 
 .brand,
@@ -246,6 +312,7 @@ createCaptcha()
   width: 36px;
   height: 36px;
   filter: drop-shadow(0 0 8px rgba(40, 220, 120, 0.45));
+  animation: glow 3.2s ease-in-out infinite;
 }
 
 .brand-text {
@@ -277,10 +344,12 @@ createCaptcha()
 }
 
 .panel {
+  position: relative;
   width: 440px;
   max-height: 100%;
   padding: 28px 26px 22px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid rgba(128, 214, 168, 0.38);
   border-radius: 18px;
   background:
@@ -289,6 +358,18 @@ createCaptcha()
     0 24px 60px rgba(0, 0, 0, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(16px);
+  animation: enter 0.7s ease both;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16%;
+  width: 28%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #e7fff4, transparent);
+  animation: sweep 3.6s ease-in-out infinite;
 }
 
 .panel::-webkit-scrollbar {
@@ -408,7 +489,12 @@ h1 {
   font-family: Consolas, 'Courier New', monospace;
   font-size: 20px;
   font-weight: 800;
+  animation: flicker 2.6s ease-in-out infinite;
 }
+
+.captcha span:nth-child(2) { animation-delay: 0.25s; }
+.captcha span:nth-child(3) { animation-delay: 0.5s; }
+.captcha span:nth-child(4) { animation-delay: 0.75s; }
 
 .refresh {
   display: grid;
@@ -424,6 +510,10 @@ h1 {
 .refresh:hover,
 .ghost:hover {
   color: #fff;
+}
+
+.refresh:hover :deep(.el-icon) {
+  animation: spin 0.55s linear;
 }
 
 .agreement {
@@ -474,6 +564,7 @@ h1 {
   justify-content: center;
   width: 100%;
   height: 48px;
+  overflow: hidden;
   border: none;
   border-radius: 12px;
   color: #fff;
@@ -484,14 +575,28 @@ h1 {
   letter-spacing: 0.08em;
 }
 
+.submit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.42) 50%, transparent 70%);
+  transform: translateX(-130%);
+  animation: sheen 4.6s ease-in-out infinite;
+}
+
 .submit .el-icon {
   position: absolute;
   right: 18px;
   font-size: 18px;
+  transition: transform 0.25s ease;
 }
 
 .submit:hover {
   filter: brightness(1.06);
+}
+
+.submit:hover .el-icon {
+  transform: translateX(4px);
 }
 
 .action-row {
@@ -514,6 +619,65 @@ h1 {
   margin: 0;
   color: #31423b;
   line-height: 1.7;
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(8%, 6%, 0) scale(1.08); }
+}
+
+@keyframes grid-shift {
+  from { background-position: 0 0; }
+  to { background-position: 56px 56px; }
+}
+
+@keyframes rise {
+  0% { transform: translateY(0); opacity: 0; }
+  12% { opacity: 0.85; }
+  100% { transform: translateY(-100vh); opacity: 0; }
+}
+
+@keyframes glow {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(40, 220, 120, 0.35)); }
+  50% { filter: drop-shadow(0 0 14px rgba(80, 255, 170, 0.85)); }
+}
+
+@keyframes enter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sweep {
+  0% { transform: translateX(-90%); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateX(280%); opacity: 0; }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes sheen {
+  0%, 58% { transform: translateX(-130%); }
+  82%, 100% { transform: translateX(130%); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora,
+  .grid,
+  .mote,
+  .brand-logo svg,
+  .panel,
+  .panel::before,
+  .captcha span,
+  .submit::before {
+    animation: none;
+  }
 }
 
 @media (max-width: 1100px) {
