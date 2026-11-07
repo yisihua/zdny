@@ -44,7 +44,7 @@ const stack = [
     <section class="hero">
       <div>
         <p class="eyebrow">Vue 3 + Element Plus + Axios</p>
-        <h1>浙大农业管理平台</h1>
+        <h1>育种材料筛选智能体平台</h1>
         <p class="lead">
           这是一个可直接开工的前端脚手架。首页展示布局，列表页通过 Axios 读取数据。
         </p>

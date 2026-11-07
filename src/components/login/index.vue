@@ -15,7 +15,7 @@ const docText = ref('')
 const docs = {
   service: {
     title: '用户服务协议',
-    text: '使用智农育种云平台前，请确认账号仅用于农业生物育种数据的查询与管理，不得用于未授权的数据导出或共享。',
+    text: '使用育种材料筛选智能体平台前，请确认账号仅用于农业生物育种数据的查询与管理，不得用于未授权的数据导出或共享。',
   },
   privacy: {
     title: '隐私政策',
@@ -137,15 +137,15 @@ createCaptcha()
         </svg>
       </span>
       <span class="brand-text">
-        <strong>智农育种云平台</strong>
-        <em>Smart Breeding Cloud Platform</em>
+        <strong>育种材料筛选智能体平台</strong>
+        <em>Breeding Material Screening Agent</em>
       </span>
     </header>
 
     <div class="stage">
       <section class="panel">
         <h1>欢迎登录</h1>
-        <p class="subtitle">农业生物育种大数据管理平台</p>
+        <p class="subtitle">育种材料筛选智能体平台</p>
 
         <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="onSubmit">
           <el-form-item prop="username">

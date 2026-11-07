@@ -1,153 +1,74 @@
 <script setup>
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { House, List } from '@element-plus/icons-vue'
-
-const route = useRoute()
-const router = useRouter()
-const activeMenu = computed(() => route.path)
-const username = computed(() => localStorage.getItem('username') || '管理员')
-
-function logout() {
-  localStorage.removeItem('token')
-  router.push('/login')
-}
+import AppHead from '@/components/head/index.vue'
 </script>
 
 <template>
-  <el-container class="layout">
-    <el-aside width="220px" class="aside">
-      <div class="brand">
-        <span class="brand-mark">农</span>
-        <div>
-          <div class="brand-title">浙大农业</div>
-          <div class="brand-sub">管理平台</div>
-        </div>
-      </div>
-      <el-menu
-        router
-        :default-active="activeMenu"
-        class="menu"
-        background-color="transparent"
-        text-color="#d5ebe1"
-        active-text-color="#ffffff"
-      >
-        <el-menu-item index="/">
-          <el-icon><House /></el-icon>
-          <span>首页</span>
-        </el-menu-item>
-        <el-menu-item index="/posts">
-          <el-icon><List /></el-icon>
-          <span>数据列表示例</span>
-        </el-menu-item>
-      </el-menu>
-    </el-aside>
-
-    <el-container class="content">
-      <el-header class="header">
-        <span class="header-title">{{ route.meta.title || '浙大农业' }}</span>
-        <span class="header-user">
-          <span>{{ username }}</span>
-          <button type="button" class="logout" @click="logout">退出</button>
-        </span>
-      </el-header>
-      <el-main class="main">
-        <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
+  <div class="layout">
+    <AppHead />
+    <main class="main">
+      <router-view />
+    </main>
+  </div>
 </template>
 
 <style scoped>
 .layout {
   height: 100%;
-}
-
-.aside {
-  display: flex;
-  flex-direction: column;
-  background: var(--agri-sidebar);
-  color: #fff;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 64px;
-  padding: 0 18px;
-}
-
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #1f7a4d;
-  font-weight: 700;
-}
-
-.brand-title {
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 1.2;
-}
-
-.brand-sub {
-  margin-top: 2px;
-  color: #b7d4c8;
-  font-size: 12px;
-}
-
-.menu {
-  border-right: none;
-  flex: 1;
-}
-
-.menu :deep(.el-menu-item:hover) {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.menu :deep(.el-menu-item.is-active) {
-  background: #1f7a4d;
-}
-
-.content {
-  min-width: 0;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 64px;
-  background: #fff;
-  border-bottom: 1px solid #e6eee9;
-}
-
-.header-title {
-  font-size: 16px;
-  font-weight: 650;
-}
-
-.header-user {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  color: #5d6b64;
-  font-size: 14px;
-}
-
-.logout {
-  border: none;
-  color: #1f7a4d;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
+  overflow: auto;
 }
 
 .main {
-  background: var(--agri-bg);
+  min-height: calc(100% - 64px);
+  padding: 20px;
+  color: #edfff6;
+  background:
+    radial-gradient(90% 50% at 12% 0%, rgba(40, 140, 90, 0.22), transparent 46%),
+    #04140f;
+}
+
+.main :deep(.el-card) {
+  border: 1px solid rgba(140, 220, 175, 0.22);
+  background: rgba(8, 36, 28, 0.72);
+  color: #edfff6;
+  box-shadow: none;
+  backdrop-filter: blur(14px);
+}
+
+.main :deep(.el-card__header) {
+  border-bottom-color: rgba(140, 220, 175, 0.18);
+  color: #edfff6;
+}
+
+.main :deep(.el-input__wrapper),
+.main :deep(.el-textarea__inner) {
+  color: #f3fff8;
+  background: rgba(3, 18, 14, 0.55);
+  box-shadow: 0 0 0 1px rgba(138, 214, 176, 0.32) inset;
+}
+
+.main :deep(.el-input__inner),
+.main :deep(.el-textarea__inner) {
+  color: #f3fff8;
+}
+
+.main :deep(.el-input__inner::placeholder),
+.main :deep(.el-textarea__inner::placeholder) {
+  color: rgba(198, 224, 210, 0.55);
+}
+
+.main :deep(.el-table) {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.04);
+  --el-table-row-hover-bg-color: rgba(80, 200, 140, 0.12);
+  --el-table-text-color: #edfff6;
+  --el-table-header-text-color: rgba(214, 245, 228, 0.82);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.04);
+  --el-table-border-color: rgba(140, 220, 175, 0.16);
+  background: transparent;
+}
+
+.main :deep(.el-empty__description p) {
+  color: rgba(214, 245, 228, 0.72);
 }
 </style>

@@ -13,24 +13,31 @@ const router = createRouter({
     {
       path: '/',
       component: MainLayout,
+      redirect: '/agent',
       children: [
         {
-          path: '',
-          name: 'home',
-          component: () => import('@/views/Home.vue'),
-          meta: { title: '首页' },
+          path: 'agent',
+          name: 'agent',
+          component: () => import('@/views/agent/index.vue'),
+          meta: { title: '智能体模块' },
         },
         {
-          path: 'posts',
-          name: 'posts',
-          component: () => import('@/views/PostList.vue'),
-          meta: { title: '数据列表示例' },
+          path: 'data',
+          name: 'data',
+          component: () => import('@/views/data/index.vue'),
+          meta: { title: '数据管理' },
+        },
+        {
+          path: 'system',
+          name: 'system',
+          component: () => import('@/views/system/index.vue'),
+          meta: { title: '系统管理' },
         },
       ],
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/',
+      redirect: '/agent',
     },
   ],
 })
@@ -52,11 +59,11 @@ router.beforeEach((to) => {
 
 router.afterEach((to) => {
   if (to.name === 'login') {
-    document.title = '登录 - 智农育种云平台'
+    document.title = '登录 - 育种材料筛选智能体平台'
     return
   }
   const title = to.meta.title
-  document.title = title ? `${title} - 浙大农业` : '浙大农业'
+  document.title = title ? `${title} - 育种材料筛选智能体平台` : '育种材料筛选智能体平台'
 })
 
 export default router
