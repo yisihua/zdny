@@ -1,4 +1,6 @@
 <script setup>
+import { t } from '@/i18n'
+
 const props = defineProps({
   modelValue: { type: String, default: '' },
   mode: { type: String, default: 'normal' },
@@ -18,19 +20,19 @@ function submit() {
 <template>
   <form class="composer" @submit.prevent="submit">
     <div class="modes">
-      <button type="button" :class="{ 'is-on': mode === 'expert' }" @click="changeMode('expert')">专家模式</button>
-      <button type="button" :class="{ 'is-on': mode === 'normal' }" @click="changeMode('normal')">普通会话</button>
+      <button type="button" :class="{ 'is-on': mode === 'expert' }" @click="changeMode('expert')">{{ t('agent.expert') }}</button>
+      <button type="button" :class="{ 'is-on': mode === 'normal' }" @click="changeMode('normal')">{{ t('agent.normal') }}</button>
     </div>
     <textarea
       :value="modelValue"
       rows="3"
-      placeholder="发送你的问题..."
+      :placeholder="t('agent.placeholder')"
       @input="emit('update:modelValue', $event.target.value)"
       @keydown.enter.exact.prevent="submit"
     ></textarea>
     <div class="bar">
-      <button type="button" class="ghost" title="附件暂未开放">附件</button>
-      <button type="submit" class="send" title="发送">发送</button>
+      <button type="button" class="ghost" :title="t('agent.attachTip')">{{ t('agent.attach') }}</button>
+      <button type="submit" class="send" :title="t('agent.send')">{{ t('agent.send') }}</button>
     </div>
   </form>
 </template>

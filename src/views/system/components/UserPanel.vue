@@ -1,6 +1,7 @@
 <script setup>
 import { reactive } from 'vue'
 import { ElMessage } from 'element-plus'
+import { t } from '@/i18n'
 
 const props = defineProps({
   users: { type: Array, required: true },
@@ -14,11 +15,11 @@ function submit() {
   const account = form.account.trim()
   const name = form.name.trim()
   if (!account || !name) {
-    ElMessage.warning('请填写账号和姓名')
+    ElMessage.warning(t('system.accountRequired'))
     return
   }
   if (props.users.some((item) => item.account === account)) {
-    ElMessage.warning('账号已存在')
+    ElMessage.warning(t('system.accountExists'))
     return
   }
   emit('add', { account, name, roleId: form.roleId })
@@ -31,41 +32,41 @@ function submit() {
 <template>
   <section class="panel">
     <header>
-      <h1>用户管理</h1>
+      <h1>{{ t('system.user') }}</h1>
       <form @submit.prevent="submit">
-        <input v-model="form.account" maxlength="20" placeholder="账号" />
-        <input v-model="form.name" maxlength="20" placeholder="姓名" />
+        <input v-model="form.account" maxlength="20" :placeholder="t('system.account')" />
+        <input v-model="form.name" maxlength="20" :placeholder="t('system.person')" />
         <select v-model="form.roleId">
-          <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+          <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.nameKey ? t(role.nameKey) : role.name }}</option>
         </select>
-        <button type="submit">新增</button>
+        <button type="submit">{{ t('system.add') }}</button>
       </form>
     </header>
     <table>
       <thead>
         <tr>
-          <th>账号</th>
-          <th>姓名</th>
-          <th>角色</th>
-          <th>操作</th>
+          <th>{{ t('system.account') }}</th>
+          <th>{{ t('system.person') }}</th>
+          <th>{{ t('system.roleCol') }}</th>
+          <th>{{ t('system.action') }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="user in users" :key="user.id">
           <td>{{ user.account }}</td>
-          <td>{{ user.name }}</td>
+          <td>{{ user.nameKey ? t(user.nameKey) : user.name }}</td>
           <td>
             <select :value="user.roleId" @change="emit('assign', user.id, $event.target.value)">
-              <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+              <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.nameKey ? t(role.nameKey) : role.name }}</option>
             </select>
           </td>
           <td>
-            <button type="button" :disabled="user.account === users[0]?.account" @click="emit('remove', user.id)">删除</button>
+            <button type="button" :disabled="user.account === users[0]?.account" @click="emit('remove', user.id)">{{ t('system.remove') }}</button>
           </td>
         </tr>
       </tbody>
     </table>
-    <p class="note">列表首位是当前登录账号，不能删除。</p>
+    <p class="note">{{ t('system.userNote') }}</p>
   </section>
 </template>
 

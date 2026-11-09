@@ -1,4 +1,6 @@
 <script setup>
+import { t } from '@/i18n'
+
 defineProps({
   sessions: { type: Array, required: true },
   activeId: { type: Number, default: null },
@@ -9,11 +11,11 @@ defineEmits(['select'])
 
 <template>
   <section class="history">
-    <p class="label">最近会话记录</p>
+    <p class="label">{{ t('agent.recent') }}</p>
     <ul>
       <li v-for="item in sessions" :key="item.id">
         <button type="button" :class="{ 'is-active': item.id === activeId }" @click="$emit('select', item.id)">
-          {{ item.title }}
+          {{ item.titleKey ? t(item.titleKey) : item.title }}
         </button>
       </li>
     </ul>

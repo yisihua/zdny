@@ -8,7 +8,7 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/components/login/index.vue'),
-      meta: { title: '登录', public: true },
+      meta: { titleKey: 'login.page', public: true },
     },
     {
       path: '/',
@@ -19,19 +19,19 @@ const router = createRouter({
           path: 'agent',
           name: 'agent',
           component: () => import('@/views/agent/index.vue'),
-          meta: { title: '智能体模块' },
+          meta: { titleKey: 'nav.agent' },
         },
         {
           path: 'data',
           name: 'data',
           component: () => import('@/views/data/index.vue'),
-          meta: { title: '数据管理' },
+          meta: { titleKey: 'nav.data' },
         },
         {
           path: 'system',
           name: 'system',
           component: () => import('@/views/system/index.vue'),
-          meta: { title: '系统管理' },
+          meta: { titleKey: 'nav.system' },
         },
       ],
     },
@@ -55,15 +55,6 @@ router.beforeEach((to) => {
     }
   }
   return true
-})
-
-router.afterEach((to) => {
-  if (to.name === 'login') {
-    document.title = '登录 - 育种材料筛选智能体平台'
-    return
-  }
-  const title = to.meta.title
-  document.title = title ? `${title} - 育种材料筛选智能体平台` : '育种材料筛选智能体平台'
 })
 
 export default router

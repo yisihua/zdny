@@ -1,4 +1,6 @@
 <script setup>
+import { t } from '@/i18n'
+
 defineProps({
   active: { type: String, required: true },
 })
@@ -6,13 +8,16 @@ defineProps({
 defineEmits(['change'])
 
 const items = [
-  { id: 'role', label: '角色管理' },
-  { id: 'user', label: '用户管理' },
+  { id: 'role', key: 'system.role' },
+  { id: 'user', key: 'system.user' },
+  { id: 'permission', key: 'system.permission' },
+  { id: 'service', key: 'system.service' },
+  { id: 'log', key: 'system.log' },
 ]
 </script>
 
 <template>
-  <nav class="nav" aria-label="系统管理">
+  <nav class="nav" :aria-label="t('system.aria')">
     <button
       v-for="item in items"
       :key="item.id"
@@ -20,7 +25,7 @@ const items = [
       :class="{ 'is-active': item.id === active }"
       @click="$emit('change', item.id)"
     >
-      {{ item.label }}
+      {{ t(item.key) }}
     </button>
   </nav>
 </template>
@@ -31,6 +36,7 @@ const items = [
   flex-direction: column;
   gap: 10px;
   padding: 16px 14px;
+  overflow: auto;
   border-right: 1px solid rgba(140, 220, 175, 0.16);
   background: rgba(3, 22, 16, 0.72);
 }

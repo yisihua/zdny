@@ -1,24 +1,47 @@
 <script setup>
-defineProps({
+import { nextTick, ref, watch } from 'vue'
+import PlotForm from './PlotForm.vue'
+import PlotResult from './PlotResult.vue'
+import { formatMessage, t } from '@/i18n'
+
+const props = defineProps({
   messages: { type: Array, default: () => [] },
 })
 
-defineEmits(['create', 'expand'])
+defineEmits(['create', 'expand', 'plot-update', 'plot-run'])
+
+const stage = ref(null)
+
+watch(
+  () => props.messages.length,
+  async () => {
+    await nextTick()
+    if (stage.value) stage.value.scrollTop = stage.value.scrollHeight
+  },
+)
 </script>
 
 <template>
-  <section class="stage">
+  <section ref="stage" class="stage">
     <div class="toolbar">
-      <button type="button" title="新建会话" @click="$emit('create')">+</button>
-      <button type="button" title="展开或收起侧栏" @click="$emit('expand')">⛶</button>
+      <button type="button" :title="t('agent.newTitle')" @click="$emit('create')">+</button>
+      <button type="button" :title="t('agent.toggleSide')" @click="$emit('expand')">⛶</button>
     </div>
 
     <div v-if="messages.length" class="thread">
-      <article v-for="item in messages" :key="item.id" :class="item.role">
-        <p>{{ item.content }}</p>
+      <article v-for="item in messages" :key="item.id" :class="[item.role, item.type]">
+        <PlotForm
+          v-if="item.type === 'plot'"
+          :form="item.form"
+          :done="item.done"
+          @update="$emit('plot-update', item.id, $event)"
+          @run="$emit('plot-run', item.id)"
+        />
+        <PlotResult v-else-if="item.type === 'result'" :result="item.result" />
+        <p v-else>{{ formatMessage(item) }}</p>
       </article>
     </div>
-    <p v-else class="hint">请输入问题，系统将以对话形式返回结果。</p>
+    <p v-else class="hint">{{ t('agent.empty') }}</p>
   </section>
 </template>
 
@@ -66,7 +89,7 @@ defineEmits(['create', 'expand'])
 }
 
 article {
-  max-width: min(680px, 86%);
+  max-width: min(760px, 94%);
   padding: 12px 14px;
   border: 1px solid rgba(140, 220, 175, 0.18);
   border-radius: 12px;

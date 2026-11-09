@@ -1,24 +1,68 @@
 <script setup>
+import { provide, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import AppHead from '@/components/head/index.vue'
+import MapPanel from '@/components/map/MapPanel.vue'
+import { mapPanelKey } from '@/components/map/context.js'
+
+const route = useRoute()
+const file = ref(null)
+const cover = ref(false)
+
+function openMap(next) {
+  file.value = next
+  cover.value = false
+}
+
+function closeMap() {
+  file.value = null
+  cover.value = false
+}
+
+provide(mapPanelKey, { file, openMap, closeMap })
+
+watch(() => route.path, closeMap)
 </script>
 
 <template>
   <div class="layout">
     <AppHead />
-    <main class="main">
-      <router-view />
-    </main>
+    <div class="body">
+      <main class="main">
+        <router-view />
+      </main>
+      <MapPanel
+        v-if="file"
+        :file="file"
+        :cover="cover"
+        @close="closeMap"
+        @cover="cover = true"
+        @restore="cover = false"
+      />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .layout {
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
+}
+
+.body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
 
 .main {
-  min-height: calc(100% - 64px);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
   padding: 20px;
   color: #edfff6;
   background:

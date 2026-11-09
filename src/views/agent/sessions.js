@@ -1,17 +1,28 @@
+import { createPlotForm } from './plot.js'
+
 export function createSessions() {
   return [
     {
-      id: 1,
-      title: '筛选耐旱水稻材料',
+      id: 7,
+      titleKey: 'session.plot',
       messages: [
-        { id: 11, role: 'user', content: '筛选耐旱、适宜长江中下游的水稻材料' },
-        { id: 12, role: 'assistant', content: '演示回复：可优先查看浙农稻 18、钱塘籼 6 的耐旱与抗稻瘟记录。模型服务尚未接入。' },
+        { id: 71, role: 'user', textKey: 'chat.plotAsk' },
+        { id: 72, role: 'assistant', textKey: 'chat.plotIntro' },
+        { id: 73, role: 'assistant', type: 'plot', form: createPlotForm(), done: false },
       ],
     },
-    { id: 2, title: '比较浙农稻18和钱塘籼6', messages: [] },
-    { id: 3, title: '查询小麦抗倒伏材料', messages: [] },
-    { id: 4, title: '玉米宜机收性状怎么筛', messages: [] },
-    { id: 5, title: '耐盐碱水稻有哪些记录', messages: [] },
-    { id: 6, title: '高产抗稻瘟材料怎么配组', messages: [] },
+    {
+      id: 1,
+      titleKey: 'session.drought',
+      messages: [
+        { id: 11, role: 'user', textKey: 'chat.droughtAsk' },
+        { id: 12, role: 'assistant', textKey: 'chat.droughtReply' },
+      ],
+    },
+    { id: 2, titleKey: 'session.compare', messages: [] },
+    { id: 3, titleKey: 'session.wheat', messages: [] },
+    { id: 4, titleKey: 'session.maize', messages: [] },
+    { id: 5, titleKey: 'session.salt', messages: [] },
+    { id: 6, titleKey: 'session.blast', messages: [] },
   ]
 }

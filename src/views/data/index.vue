@@ -1,41 +1,144 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import ScopeBar from './components/ScopeBar.vue'
+import FilterBar from './components/FilterBar.vue'
+import FileList from './components/FileList.vue'
+import DataPager from './components/DataPager.vue'
+import { useMapPanel } from '@/components/map/context.js'
+import { t } from '@/i18n'
+import { canLoadMap, createPersonalRecords, createPublicRecords, extOf } from './records.js'
 
+const pageSize = 5
+const scope = ref('personal')
+const searchBy = ref('file')
 const keyword = ref('')
-const materials = [
-  { code: 'R-2401', name: '浙农稻 18', type: '水稻', trait: '耐旱、中熟', updatedAt: '2026-03-12' },
-  { code: 'R-2408', name: '钱塘籼 6', type: '水稻', trait: '高产、抗稻瘟', updatedAt: '2026-04-02' },
-  { code: 'W-1103', name: '麦香 9 号', type: '小麦', trait: '抗倒伏', updatedAt: '2026-02-18' },
-  { code: 'M-0816', name: '甜玉 3 号', type: '玉米', trait: '宜机收', updatedAt: '2026-01-26' },
-]
+const ext = ref('all')
+const order = ref('new')
+const page = ref(1)
+const personal = ref(createPersonalRecords())
+const publicRecords = ref(createPublicRecords())
+const picker = ref(null)
+const { file: preview, openMap, closeMap } = useMapPanel()
+
+const current = computed(() => (scope.value === 'personal' ? personal.value : publicRecords.value))
 
 const filtered = computed(() => {
   const text = keyword.value.trim().toLowerCase()
-  if (!text) return materials
-  return materials.filter((item) =>
-    [item.code, item.name, item.type, item.trait].some((field) => field.toLowerCase().includes(text)),
-  )
+  const list = current.value.filter((item) => {
+    const field = searchBy.value === 'session' ? item.sessionId : item.fileName
+    const hitText = !text || field.toLowerCase().includes(text)
+    const hitExt = ext.value === 'all' || item.ext === ext.value
+    return hitText && hitExt
+  })
+  return list.sort((a, b) => {
+    const delta = a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0
+    return order.value === 'new' ? -delta : delta
+  })
 })
+
+const paged = computed(() => {
+  const start = (page.value - 1) * pageSize
+  return filtered.value.slice(start, start + pageSize)
+})
+
+watch([keyword, searchBy, ext, order, scope], () => {
+  page.value = 1
+})
+
+watch(filtered, (list) => {
+  const max = Math.max(1, Math.ceil(list.length / pageSize))
+  if (page.value > max) page.value = max
+})
+
+function upload() {
+  picker.value?.click()
+}
+
+function onPick(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  const now = new Date()
+  personal.value.unshift({
+    id: `up-${now.getTime()}`,
+    fileName: file.name,
+    sessionId: `s-${now.getTime().toString().slice(-4)}`,
+    ext: extOf(file.name),
+    sizeKb: Math.max(1, Math.round(file.size / 1024)),
+    time: now.toTimeString().slice(0, 5),
+    code: `P-${String(personal.value.length + 1).padStart(4, '0')}`,
+    name: file.name.replace(/\.[^.]+$/, ''),
+    crop: '上传',
+    trait: '本地上传',
+    updatedAt: now.toISOString().slice(0, 10),
+  })
+  scope.value = 'personal'
+  searchBy.value = 'file'
+  keyword.value = ''
+  ext.value = 'all'
+  order.value = 'new'
+  ElMessage.success(t('data.uploaded'))
+}
+
+function loadMap(row) {
+  if (canLoadMap(row.ext)) openMap(row)
+}
+
+function download(row) {
+  const blob = new Blob([`${row.fileName}\n${t('data.session')}: ${row.sessionId}\n`], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = row.fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function remove(row) {
+  const list = scope.value === 'personal' ? personal : publicRecords
+  list.value = list.value.filter((item) => item.id !== row.id)
+  if (preview.value?.id === row.id) closeMap()
+}
 </script>
 
 <template>
   <div class="page">
     <header class="heading">
-      <h1>数据管理</h1>
-      <p>管理育种材料的基础信息。下表为示例数据。</p>
+      <h1>{{ t('nav.data') }}</h1>
+      <p>{{ scope === 'personal' ? t('data.personalHint') : t('data.publicHint') }}</p>
     </header>
 
-    <el-card shadow="never">
+    <el-card class="board" shadow="never">
       <div class="toolbar">
-        <el-input v-model="keyword" clearable placeholder="搜索编号、名称、作物或性状" class="search" />
+        <ScopeBar :active="scope" @change="scope = $event" />
+        <button type="button" class="upload" @click="upload">{{ t('data.upload') }}</button>
+        <input
+          ref="picker"
+          type="file"
+          hidden
+          accept=".tif,.tiff,.shp,.png,.zip,.csv,.geojson,.json,.txt,.pdf"
+          @change="onPick"
+        />
       </div>
-      <el-table :data="filtered" stripe>
-        <el-table-column prop="code" label="材料编号" width="120" />
-        <el-table-column prop="name" label="名称" min-width="140" />
-        <el-table-column prop="type" label="作物" width="100" />
-        <el-table-column prop="trait" label="目标性状" min-width="180" />
-        <el-table-column prop="updatedAt" label="更新日期" width="140" />
-      </el-table>
+      <FilterBar
+        :search-by="searchBy"
+        :keyword="keyword"
+        :ext="ext"
+        :order="order"
+        @update:search-by="searchBy = $event"
+        @update:keyword="keyword = $event"
+        @update:ext="ext = $event"
+        @update:order="order = $event"
+      />
+      <FileList
+        :rows="paged"
+        :status="scope === 'personal' ? t('data.personalStatus') : t('data.published')"
+        @load="loadMap"
+        @download="download"
+        @remove="remove"
+      />
+      <DataPager :page="page" :total="filtered.length" :page-size="pageSize" @update:page="page = $event" />
     </el-card>
   </div>
 </template>
@@ -45,6 +148,24 @@ const filtered = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: calc(100vh - 104px);
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.board :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .heading h1 {
@@ -58,10 +179,29 @@ const filtered = computed(() => {
 }
 
 .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
-.search {
-  width: min(360px, 100%);
+.upload {
+  height: 36px;
+  margin-left: auto;
+  padding: 0 18px;
+  border: none;
+  border-radius: 8px;
+  color: #042117;
+  background: linear-gradient(90deg, #8cf0ae, #2fbf6a);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 800px) {
+  .upload {
+    margin-left: 0;
+  }
 }
 </style>

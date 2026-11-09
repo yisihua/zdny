@@ -1,6 +1,7 @@
 <script setup>
 import { ElMessage } from 'element-plus'
 import SessionList from './SessionList.vue'
+import { t } from '@/i18n'
 
 defineProps({
   collapsed: { type: Boolean, default: false },
@@ -10,25 +11,25 @@ defineProps({
 
 const emit = defineEmits(['toggle', 'create', 'select'])
 
-function pending(name) {
-  ElMessage.info(`${name}暂未开放`)
+function pending(key) {
+  ElMessage.info(t('agent.pending', { name: t(key) }))
 }
 </script>
 
 <template>
   <aside class="side" :class="{ 'is-collapsed': collapsed }">
     <header class="side-head">
-      <strong v-if="!collapsed">智能工作台</strong>
-      <button type="button" class="icon" title="收起侧栏" @click="emit('toggle')">
+      <strong v-if="!collapsed">{{ t('agent.workbench') }}</strong>
+      <button type="button" class="icon" :title="collapsed ? t('agent.expand') : t('agent.collapse')" @click="emit('toggle')">
         {{ collapsed ? '›' : '‹' }}
       </button>
     </header>
 
     <template v-if="!collapsed">
-      <button type="button" class="create" @click="emit('create')">+ 新建会话</button>
+      <button type="button" class="create" @click="emit('create')">{{ t('agent.newSession') }}</button>
       <div class="tools">
-        <button type="button" @click="pending('模型管理')">模型管理</button>
-        <button type="button" @click="pending('文件管理')">文件管理</button>
+        <button type="button" @click="pending('agent.model')">{{ t('agent.model') }}</button>
+        <button type="button" @click="pending('agent.files')">{{ t('agent.files') }}</button>
       </div>
       <SessionList :sessions="sessions" :active-id="activeId" @select="emit('select', $event)" />
     </template>

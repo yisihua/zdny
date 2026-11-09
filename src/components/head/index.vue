@@ -1,15 +1,17 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import LangSwitch from '@/components/LangSwitch.vue'
+import { locale, t } from '@/i18n'
 
 const router = useRouter()
-const username = computed(() => localStorage.getItem('username') || '管理员')
-const initial = computed(() => username.value.trim().charAt(0) || '用')
+const username = computed(() => localStorage.getItem('username') || t('head.admin'))
+const initial = computed(() => username.value.trim().charAt(0) || 'A')
 
 const menus = [
-  { to: '/agent', label: '智能体模块' },
-  { to: '/data', label: '数据管理' },
-  { to: '/system', label: '系统管理' },
+  { to: '/agent', key: 'nav.agent' },
+  { to: '/data', key: 'nav.data' },
+  { to: '/system', key: 'nav.system' },
 ]
 
 function logout() {
@@ -19,31 +21,32 @@ function logout() {
 </script>
 
 <template>
-  <header class="app-head">
+  <header class="app-head" :class="{ 'is-en': locale === 'en' }">
     <router-link class="brand" to="/agent">
       <img class="logo" src="/head/logo.png" alt="" />
       <span class="divider" aria-hidden="true"></span>
       <span class="title">
-        <span class="title-shine" aria-hidden="true">育种材料筛选智能体平台</span>
-        育种材料筛选智能体平台
+        <span class="title-shine" aria-hidden="true">{{ t('app.name') }}</span>
+        {{ t('app.name') }}
       </span>
     </router-link>
 
-    <nav class="nav" aria-label="页面导航">
+    <nav class="nav" :aria-label="t('nav.aria')">
       <router-link
         v-for="item in menus"
         :key="item.to"
         :to="item.to"
         exact-active-class="is-active"
       >
-        {{ item.label }}
+        {{ t(item.key) }}
       </router-link>
     </nav>
 
     <div class="user">
       <span class="avatar" aria-hidden="true">{{ initial }}</span>
       <span class="name">{{ username }}</span>
-      <button type="button" class="logout" @click="logout">注销</button>
+      <LangSwitch />
+      <button type="button" class="logout" @click="logout">{{ t('head.logout') }}</button>
     </div>
   </header>
 </template>
@@ -204,6 +207,11 @@ function logout() {
   100% {
     background-position: -30% 0;
   }
+}
+
+.app-head.is-en .title {
+  font-size: 18px;
+  letter-spacing: 0;
 }
 
 @media (max-width: 860px) {

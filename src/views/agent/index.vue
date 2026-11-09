@@ -5,9 +5,11 @@ import WorkbenchSide from './components/WorkbenchSide.vue'
 import ChatStage from './components/ChatStage.vue'
 import ChatComposer from './components/ChatComposer.vue'
 import { createSessions } from './sessions.js'
+import { createPlotForm, plotChoice, plotResult } from './plot.js'
+import { t } from '@/i18n'
 
 const sessions = ref(createSessions())
-const activeId = ref(null)
+const activeId = ref(7)
 const collapsed = ref(false)
 const mode = ref('normal')
 const draft = ref('')
@@ -22,7 +24,7 @@ function createSession() {
 function send(text) {
   const content = text.trim()
   if (!content) {
-    ElMessage.warning('请输入问题')
+    ElMessage.warning(t('chat.needQuestion'))
     return
   }
   if (!activeId.value) {
@@ -31,11 +33,45 @@ function send(text) {
     activeId.value = session.id
   }
   const session = sessions.value.find((item) => item.id === activeId.value)
-  const reply = mode.value === 'expert'
-    ? `已按专家模式记录：「${content}」。当前为演示会话，模型服务尚未接入。`
-    : `已收到：「${content}」。当前为演示会话，将以对话形式返回结果。`
-  session.messages.push({ id: Date.now(), role: 'user', content }, { id: Date.now() + 1, role: 'assistant', content: reply })
+  session.messages.push({ id: Date.now(), role: 'user', content })
+  if (/田块提取|田块分割|免拼接|field extraction|extract fields|stitch-free|field segment/i.test(content)) {
+    session.messages.push(
+      { id: Date.now() + 1, role: 'assistant', textKey: 'chat.plotIntro' },
+      { id: Date.now() + 2, role: 'assistant', type: 'plot', form: createPlotForm(), done: false },
+    )
+  } else {
+    session.messages.push({
+      id: Date.now() + 1,
+      role: 'assistant',
+      textKey: mode.value === 'expert' ? 'chat.expertReply' : 'chat.normalReply',
+      params: { content },
+    })
+  }
   draft.value = ''
+}
+
+function findMessage(id) {
+  for (const session of sessions.value) {
+    const message = session.messages.find((item) => item.id === id)
+    if (message) return { session, message }
+  }
+  return null
+}
+
+function updatePlot(id, patch) {
+  const found = findMessage(id)
+  if (found && !found.message.done) Object.assign(found.message.form, patch)
+}
+
+function runPlot(id) {
+  const found = findMessage(id)
+  if (!found || found.message.done) return
+  found.message.done = true
+  const now = Date.now()
+  found.session.messages.push(
+    { id: now, role: 'user', ...plotChoice(found.message.form) },
+    { id: now + 1, role: 'assistant', type: 'result', result: plotResult(found.message.form) },
+  )
 }
 </script>
 
@@ -50,7 +86,13 @@ function send(text) {
       @select="activeId = $event"
     />
     <section class="chat">
-      <ChatStage :messages="messages" @create="createSession" @expand="collapsed = !collapsed" />
+      <ChatStage
+        :messages="messages"
+        @create="createSession"
+        @expand="collapsed = !collapsed"
+        @plot-update="updatePlot"
+        @plot-run="runPlot"
+      />
       <ChatComposer v-model="draft" v-model:mode="mode" @send="send" />
     </section>
   </div>

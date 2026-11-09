@@ -1,27 +1,17 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight, Lock, RefreshRight, User } from '@element-plus/icons-vue'
+import LangSwitch from '@/components/LangSwitch.vue'
+import { locale, t } from '@/i18n'
 
 const router = useRouter()
 const route = useRoute()
 const formRef = ref()
 const captchaCode = ref('')
 const docVisible = ref(false)
-const docTitle = ref('')
-const docText = ref('')
-
-const docs = {
-  service: {
-    title: '用户服务协议',
-    text: '使用育种材料筛选智能体平台前，请确认账号仅用于农业生物育种数据的查询与管理，不得用于未授权的数据导出或共享。',
-  },
-  privacy: {
-    title: '隐私政策',
-    text: '平台仅收集登录所需的用户名、工号和操作日志，用于身份校验与安全审计，不会向无关第三方提供。',
-  },
-}
+const docKey = ref('')
 
 const motes = [
   { left: '6%', size: '2px', delay: '0s', duration: '13s' },
@@ -45,11 +35,11 @@ const form = reactive({
   agreed: false,
 })
 
-const rules = {
-  username: [{ required: true, message: '请输入用户名/工号', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  captcha: [{ required: true, message: '请输入动态验证码', trigger: 'blur' }],
-}
+const rules = computed(() => ({
+  username: [{ required: true, message: t('login.userRequired'), trigger: 'blur' }],
+  password: [{ required: true, message: t('login.passwordRequired'), trigger: 'blur' }],
+  captcha: [{ required: true, message: t('login.captchaRequired'), trigger: 'blur' }],
+}))
 
 function createCaptcha() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -74,34 +64,32 @@ async function onSubmit() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
   if (form.captcha.trim().toLowerCase() !== captchaCode.value.toLowerCase()) {
-    ElMessage.error('验证码不正确')
+    ElMessage.error(t('login.captchaBad'))
     refreshCaptcha()
     return
   }
   if (!form.agreed) {
-    ElMessage.warning('请先阅读并同意用户服务协议和隐私政策')
+    ElMessage.warning(t('login.agreeRequired'))
     return
   }
   const username = form.username.trim()
   localStorage.setItem('username', username)
   localStorage.setItem('token', 'demo-token')
-  ElMessage.success('登录成功')
+  ElMessage.success(t('login.ok'))
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
   router.push(redirect)
 }
 
 function onForgot() {
-  ElMessage.info('请联系管理员重置密码')
+  ElMessage.info(t('login.forgotTip'))
 }
 
 function onRegister() {
-  ElMessage.info('注册功能暂未开放')
+  ElMessage.info(t('login.registerTip'))
 }
 
 function openDoc(key) {
-  const doc = docs[key]
-  docTitle.value = doc.title
-  docText.value = doc.text
+  docKey.value = key
   docVisible.value = true
 }
 
@@ -127,6 +115,10 @@ createCaptcha()
       aria-hidden="true"
     ></span>
 
+    <div class="lang-slot">
+      <LangSwitch />
+    </div>
+
     <header class="brand">
       <span class="brand-logo" aria-hidden="true">
         <svg viewBox="0 0 32 32" fill="none">
@@ -137,19 +129,19 @@ createCaptcha()
         </svg>
       </span>
       <span class="brand-text">
-        <strong>育种材料筛选智能体平台</strong>
-        <em>Breeding Material Screening Agent</em>
+        <strong>{{ t('app.name') }}</strong>
+        <em>{{ locale === 'zh' ? 'Breeding Material Screening Agent' : '育种材料筛选智能体平台' }}</em>
       </span>
     </header>
 
     <div class="stage">
       <section class="panel">
-        <h1>欢迎登录</h1>
-        <p class="subtitle">育种材料筛选智能体平台</p>
+        <h1>{{ t('login.welcome') }}</h1>
+        <p class="subtitle">{{ t('app.name') }}</p>
 
         <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="onSubmit">
           <el-form-item prop="username">
-            <el-input v-model="form.username" placeholder="请输入用户名/工号" autocomplete="username">
+            <el-input v-model="form.username" :placeholder="t('login.user')" autocomplete="username">
               <template #prefix>
                 <el-icon><User /></el-icon>
               </template>
@@ -161,7 +153,7 @@ createCaptcha()
               v-model="form.password"
               type="password"
               show-password
-              placeholder="请输入密码"
+              :placeholder="t('login.password')"
               autocomplete="current-password"
             >
               <template #prefix>
@@ -172,7 +164,7 @@ createCaptcha()
 
           <el-form-item prop="captcha">
             <div class="captcha-row">
-              <el-input v-model="form.captcha" placeholder="请输入动态验证码" maxlength="4">
+              <el-input v-model="form.captcha" :placeholder="t('login.captcha')" maxlength="4">
                 <template #prefix>
                   <svg class="shield" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path
@@ -185,12 +177,12 @@ createCaptcha()
                   </svg>
                 </template>
               </el-input>
-              <button type="button" class="captcha" title="点击刷新验证码" @click="refreshCaptcha">
+              <button type="button" class="captcha" :title="t('login.captchaRefresh')" @click="refreshCaptcha">
                 <span v-for="(char, index) in captchaCode" :key="index" :style="captchaStyle(index)">
                   {{ char }}
                 </span>
               </button>
-              <button type="button" class="refresh" title="刷新验证码" @click="refreshCaptcha">
+              <button type="button" class="refresh" :title="t('login.captchaRefresh')" @click="refreshCaptcha">
                 <el-icon><RefreshRight /></el-icon>
               </button>
             </div>
@@ -199,26 +191,26 @@ createCaptcha()
           <div class="agreement">
             <el-checkbox v-model="form.agreed" />
             <span>
-              我已阅读并同意
-              <button type="button" class="link" @click="openDoc('service')">用户服务协议</button>
-              和
-              <button type="button" class="link" @click="openDoc('privacy')">隐私政策</button>
+              {{ t('login.agree') }}
+              <button type="button" class="link" @click="openDoc('service')">{{ t('login.service') }}</button>
+              {{ t('login.and') }}
+              <button type="button" class="link" @click="openDoc('privacy')">{{ t('login.privacy') }}</button>
             </span>
           </div>
 
           <button class="submit" type="submit">
-            <span>安全登录</span>
+            <span>{{ t('login.submit') }}</span>
             <el-icon><ArrowRight /></el-icon>
           </button>
 
           <div class="action-row">
-            <button type="button" class="ghost" @click="onRegister">注册</button>
-            <button type="button" class="ghost" @click="onForgot">忘记密码</button>
+            <button type="button" class="ghost" @click="onRegister">{{ t('login.register') }}</button>
+            <button type="button" class="ghost" @click="onForgot">{{ t('login.forgot') }}</button>
           </div>
         </el-form>
 
-        <el-dialog v-model="docVisible" :title="docTitle" width="480px" append-to-body>
-          <p class="doc-text">{{ docText }}</p>
+        <el-dialog v-model="docVisible" :title="t(docKey === 'privacy' ? 'login.privacy' : 'login.service')" width="480px" append-to-body>
+          <p class="doc-text">{{ t(docKey === 'privacy' ? 'login.privacyText' : 'login.serviceText') }}</p>
         </el-dialog>
       </section>
     </div>
@@ -285,6 +277,13 @@ createCaptcha()
 .stage {
   position: relative;
   z-index: 1;
+}
+
+.lang-slot {
+  position: absolute;
+  top: 28px;
+  right: 26px;
+  z-index: 2;
 }
 
 .brand {

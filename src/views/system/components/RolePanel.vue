@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { t } from '@/i18n'
 
 const props = defineProps({
   roles: { type: Array, required: true },
@@ -13,11 +14,11 @@ const name = ref('')
 function submit() {
   const text = name.value.trim()
   if (!text) {
-    ElMessage.warning('请输入角色名称')
+    ElMessage.warning(t('system.roleRequired'))
     return
   }
-  if (props.roles.some((item) => item.name === text)) {
-    ElMessage.warning('角色已存在')
+  if (props.roles.some((item) => (item.nameKey ? t(item.nameKey) : item.name) === text)) {
+    ElMessage.warning(t('system.roleExists'))
     return
   }
   emit('add', text)
@@ -26,11 +27,11 @@ function submit() {
 
 function remove(role) {
   if (role.builtin) {
-    ElMessage.warning('内置角色不能删除')
+    ElMessage.warning(t('system.roleLocked'))
     return
   }
   if (props.users.some((item) => item.roleId === role.id)) {
-    ElMessage.warning('该角色下仍有用户')
+    ElMessage.warning(t('system.roleBusy'))
     return
   }
   emit('remove', role.id)
@@ -40,27 +41,27 @@ function remove(role) {
 <template>
   <section class="panel">
     <header>
-      <h1>角色管理</h1>
+      <h1>{{ t('system.role') }}</h1>
       <form @submit.prevent="submit">
-        <input v-model="name" maxlength="20" placeholder="新增角色名称" />
-        <button type="submit">新增</button>
+        <input v-model="name" maxlength="20" :placeholder="t('system.roleName')" />
+        <button type="submit">{{ t('system.add') }}</button>
       </form>
     </header>
     <table>
       <thead>
         <tr>
-          <th>角色</th>
-          <th>编码</th>
-          <th>说明</th>
-          <th>操作</th>
+          <th>{{ t('system.roleCol') }}</th>
+          <th>{{ t('system.code') }}</th>
+          <th>{{ t('system.remark') }}</th>
+          <th>{{ t('system.action') }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="role in roles" :key="role.id">
-          <td>{{ role.name }}<em v-if="role.builtin">内置</em></td>
+          <td>{{ role.nameKey ? t(role.nameKey) : role.name }}<em v-if="role.builtin">{{ t('system.builtin') }}</em></td>
           <td>{{ role.code }}</td>
-          <td>{{ role.remark }}</td>
-          <td><button type="button" :disabled="role.builtin" @click="remove(role)">删除</button></td>
+          <td>{{ role.remarkKey ? t(role.remarkKey) : role.remark }}</td>
+          <td><button type="button" :disabled="role.builtin" @click="remove(role)">{{ t('system.remove') }}</button></td>
         </tr>
       </tbody>
     </table>
