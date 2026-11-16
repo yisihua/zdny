@@ -1,7 +1,16 @@
 import { createPlotForm } from './plot.js'
+import { createPhenoGroup } from './algorithm.js'
 
 export function createSessions() {
   return [
+    {
+      id: 8,
+      titleKey: 'session.workflow',
+      messages: [
+        { id: 81, role: 'user', textKey: 'chat.workflowAsk' },
+        { id: 82, role: 'assistant', type: 'workflow', textKey: 'chat.workflowReply', group: createPhenoGroup() },
+      ],
+    },
     {
       id: 7,
       titleKey: 'session.plot',

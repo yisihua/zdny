@@ -1,78 +1,521 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import WorkbenchSide from './components/WorkbenchSide.vue'
 import ChatStage from './components/ChatStage.vue'
 import ChatComposer from './components/ChatComposer.vue'
-import { createSessions } from './sessions.js'
+import {
+  MESSAGE_TYPE_SYSTEM,
+  MESSAGE_TYPE_USER,
+  createSession as createSessionApi,
+  createSessionMessage,
+  deleteSession as deleteSessionApi,
+  fetchSessionMessages,
+  fetchSessions,
+  renameSession,
+} from '@/api/session'
+import {
+  llmSessionId,
+  parseAlgorithmGroupMessage,
+  parseWorkflowOutputsMessage,
+  parseWorkflowRunMessage,
+  serializeAlgorithmGroupMessage,
+  serializeWorkflowOutputsMessage,
+  serializeWorkflowRunMessage,
+  streamSessionChat,
+} from '@/api/llmChat'
 import { createPlotForm, plotChoice, plotResult } from './plot.js'
 import { t } from '@/i18n'
+import '@/styles/system-dialog.css'
 
-const sessions = ref(createSessions())
-const activeId = ref(7)
+const sessions = ref([])
+const messages = ref([])
+const activeId = ref(null)
 const collapsed = ref(false)
-const mode = ref('normal')
 const draft = ref('')
+const loadingSessions = ref(false)
+const loadingMessages = ref(false)
+const sending = ref(false)
 
-const messages = computed(() => sessions.value.find((item) => item.id === activeId.value)?.messages || [])
+const localExtras = ref({})
 
-function createSession() {
-  activeId.value = null
-  draft.value = ''
+const displayMessages = computed(() => {
+  const extras = localExtras.value[activeId.value] || []
+  if (!extras.length) return messages.value
+  return [...messages.value, ...extras]
+})
+
+function toUiMessage(item) {
+  const base = {
+    id: String(item.id),
+    role: Number(item.messageType) === MESSAGE_TYPE_USER ? 'user' : 'assistant',
+    content: item.content || '',
+    jobId: item.jobId ?? null,
+    reportId: item.reportId ?? null,
+    reportStatus: item.reportStatus ?? null,
+    createdAt: item.createdAt || null,
+  }
+
+  if (Number(item.messageType) === MESSAGE_TYPE_SYSTEM) {
+    const group = parseAlgorithmGroupMessage(item.content)
+    if (group) {
+      return {
+        ...base,
+        type: 'workflow',
+        content: '',
+        group,
+      }
+    }
+    const outputFiles = parseWorkflowOutputsMessage(item.content)
+    if (outputFiles) {
+      return {
+        ...base,
+        type: 'outputs',
+        content: '',
+        files: outputFiles,
+      }
+    }
+    const runInfo = parseWorkflowRunMessage(item.content)
+    if (runInfo) {
+      return {
+        ...base,
+        content: runInfo.text || `开始运行：${runInfo.name || '工作流'}`,
+      }
+    }
+  }
+
+  return base
 }
 
-function send(text) {
-  const content = text.trim()
+function sessionTitleFromContent(content) {
+  const text = String(content || '').trim().replace(/\s+/g, ' ')
+  if (!text) return t('agent.newTitle')
+  return text.length > 40 ? `${text.slice(0, 40)}…` : text
+}
+
+async function loadAllSessions() {
+  loadingSessions.value = true
+  try {
+    const records = []
+    let page = 1
+    let totalPages = 1
+    do {
+      const data = await fetchSessions({ page, pageSize: 50 })
+      const pageRecords = Array.isArray(data?.records) ? data.records : []
+      records.push(...pageRecords)
+      const total = Number(data?.total)
+      const size = Number(data?.pageSize) || 50
+      totalPages = Number.isFinite(total) && total > 0 ? Math.ceil(total / size) : 1
+      page += 1
+    } while (page <= totalPages && page <= 20)
+
+    sessions.value = records.map((item) => ({
+      id: String(item.id),
+      title: item.title || t('agent.newTitle'),
+      createdAt: item.createdAt || null,
+      updatedAt: item.updatedAt || null,
+    }))
+
+    if (activeId.value && !sessions.value.some((item) => item.id === activeId.value)) {
+      activeId.value = null
+      messages.value = []
+    }
+  } catch {
+    sessions.value = []
+  } finally {
+    loadingSessions.value = false
+  }
+}
+
+async function loadMessages(sessionId) {
+  if (!sessionId) {
+    messages.value = []
+    return
+  }
+
+  loadingMessages.value = true
+  try {
+    const map = new Map()
+    let page = 1
+    let totalPages = 1
+    do {
+      const data = await fetchSessionMessages(sessionId, { page, pageSize: 50 })
+      const pageRecords = Array.isArray(data?.records) ? data.records : []
+      pageRecords.forEach((item) => {
+        const ui = toUiMessage(item)
+        map.set(ui.id, ui)
+      })
+      // 切换会话时清掉该会话临时气泡，避免和历史工作流重复
+      if (localExtras.value[sessionId]) {
+        localExtras.value = { ...localExtras.value, [sessionId]: [] }
+      }
+      const total = Number(data?.total)
+      const size = Number(data?.pageSize) || 50
+      totalPages = Number.isFinite(total) && total > 0 ? Math.ceil(total / size) : 1
+      page += 1
+    } while (page <= totalPages && page <= 40)
+
+    messages.value = Array.from(map.values()).sort((a, b) => {
+      const ta = a.createdAt || ''
+      const tb = b.createdAt || ''
+      if (ta !== tb) return ta.localeCompare(tb)
+      return String(a.id).localeCompare(String(b.id))
+    })
+  } catch {
+    messages.value = []
+  } finally {
+    loadingMessages.value = false
+  }
+}
+
+async function selectSession(id) {
+  const next = id == null ? null : String(id)
+  if (activeId.value === next) return
+  activeId.value = next
+  draft.value = ''
+  await loadMessages(next)
+}
+
+async function createSession() {
+  if (sending.value) return
+  sending.value = true
+  try {
+    const data = await createSessionApi({ title: t('agent.newTitle') })
+    const session = {
+      id: String(data.id),
+      title: data.title || t('agent.newTitle'),
+      createdAt: data.createdAt || null,
+      updatedAt: data.updatedAt || null,
+    }
+    sessions.value = [session, ...sessions.value.filter((item) => item.id !== session.id)]
+    activeId.value = session.id
+    messages.value = []
+    localExtras.value = { ...localExtras.value, [session.id]: [] }
+    draft.value = ''
+  } catch {
+    // request interceptor already shows message
+  } finally {
+    sending.value = false
+  }
+}
+
+async function onRename(session) {
+  try {
+    const { value } = await ElMessageBox.prompt(t('agent.renameTip'), t('agent.rename'), {
+      inputValue: session.title,
+      inputPlaceholder: t('agent.renamePh'),
+      confirmButtonText: t('system.save'),
+      cancelButtonText: t('system.cancel'),
+      customClass: 'system-message-box',
+      inputValidator: (input) => {
+        const title = String(input || '').trim()
+        if (!title) return t('agent.renameRequired')
+        if (title.length > 256) return t('agent.renameLong')
+        return true
+      },
+    })
+    const title = String(value || '').trim()
+    const data = await renameSession(session.id, title)
+    const nextTitle = data?.title || title
+    sessions.value = sessions.value.map((item) =>
+      item.id === session.id ? { ...item, title: nextTitle, updatedAt: data?.updatedAt || item.updatedAt } : item,
+    )
+    ElMessage.success(t('agent.renamed'))
+  } catch {
+    // cancelled or failed
+  }
+}
+
+async function onDelete(session) {
+  try {
+    await ElMessageBox.confirm(t('agent.deleteConfirm', { name: session.title }), t('agent.delete'), {
+      type: 'warning',
+      customClass: 'system-message-box',
+      confirmButtonText: t('system.remove'),
+      cancelButtonText: t('system.cancel'),
+    })
+    await deleteSessionApi(session.id)
+    sessions.value = sessions.value.filter((item) => item.id !== session.id)
+    const nextExtras = { ...localExtras.value }
+    delete nextExtras[session.id]
+    localExtras.value = nextExtras
+    if (activeId.value === session.id) {
+      activeId.value = null
+      messages.value = []
+      draft.value = ''
+    }
+    ElMessage.success(t('agent.deleted'))
+  } catch {
+    // cancelled or failed
+  }
+}
+
+function pushLocalExtra(sessionId, item) {
+  const list = [...(localExtras.value[sessionId] || []), item]
+  localExtras.value = { ...localExtras.value, [sessionId]: list }
+  return item
+}
+
+function patchLocalExtra(sessionId, id, patch) {
+  const list = [...(localExtras.value[sessionId] || [])]
+  const index = list.findIndex((item) => item.id === id)
+  if (index < 0) return
+  list[index] = { ...list[index], ...patch }
+  localExtras.value = { ...localExtras.value, [sessionId]: list }
+}
+
+function removeLocalExtra(sessionId, id) {
+  const list = (localExtras.value[sessionId] || []).filter((item) => item.id !== id)
+  localExtras.value = { ...localExtras.value, [sessionId]: list }
+}
+
+async function ensureSession(content) {
+  let sessionId = activeId.value
+  if (!sessionId) {
+    const created = await createSessionApi({ title: sessionTitleFromContent(content) })
+    sessionId = String(created.id)
+    sessions.value = [
+      {
+        id: sessionId,
+        title: created.title || sessionTitleFromContent(content),
+        createdAt: created.createdAt || null,
+        updatedAt: created.updatedAt || null,
+      },
+      ...sessions.value,
+    ]
+    activeId.value = sessionId
+    messages.value = []
+    return sessionId
+  }
+
+  const current = sessions.value.find((item) => item.id === sessionId)
+  if (current && (!current.title || current.title === t('agent.newTitle'))) {
+    try {
+      const renamed = await renameSession(sessionId, sessionTitleFromContent(content))
+      sessions.value = sessions.value.map((item) =>
+        item.id === sessionId
+          ? { ...item, title: renamed?.title || sessionTitleFromContent(content), updatedAt: renamed?.updatedAt || item.updatedAt }
+          : item,
+      )
+    } catch {
+      // ignore rename failure on first message
+    }
+  }
+  return sessionId
+}
+
+async function send(text) {
+  const content = String(text || '').trim()
   if (!content) {
     ElMessage.warning(t('chat.needQuestion'))
     return
   }
-  if (!activeId.value) {
-    const session = { id: Date.now(), title: content.slice(0, 18), messages: [] }
-    sessions.value.unshift(session)
-    activeId.value = session.id
-  }
-  const session = sessions.value.find((item) => item.id === activeId.value)
-  session.messages.push({ id: Date.now(), role: 'user', content })
-  if (/田块提取|田块分割|免拼接|field extraction|extract fields|stitch-free|field segment/i.test(content)) {
-    session.messages.push(
-      { id: Date.now() + 1, role: 'assistant', textKey: 'chat.plotIntro' },
-      { id: Date.now() + 2, role: 'assistant', type: 'plot', form: createPlotForm(), done: false },
-    )
-  } else {
-    session.messages.push({
-      id: Date.now() + 1,
-      role: 'assistant',
-      textKey: mode.value === 'expert' ? 'chat.expertReply' : 'chat.normalReply',
-      params: { content },
-    })
-  }
+  if (sending.value) return
+
+  sending.value = true
   draft.value = ''
+  let streamTextId = ''
+  let sessionId = ''
+
+  try {
+    sessionId = await ensureSession(content)
+
+    const userMsg = await createSessionMessage(sessionId, {
+      content,
+      messageType: MESSAGE_TYPE_USER,
+      jobId: null,
+    })
+    messages.value = [...messages.value, toUiMessage(userMsg)]
+
+    streamTextId = `local-stream-${Date.now()}`
+    pushLocalExtra(sessionId, {
+      id: streamTextId,
+      role: 'assistant',
+      content: '',
+      streaming: true,
+      thinking: true,
+    })
+
+    let outputText = ''
+    const groups = []
+    const localWorkflowIds = []
+    let streamError = ''
+
+    await streamSessionChat({
+      sessionId: llmSessionId(sessionId),
+      question: content,
+      onEvent: (event) => {
+        if (event.type === 'output') {
+          outputText += event.delta || ''
+          patchLocalExtra(sessionId, streamTextId, {
+            content: outputText,
+            thinking: !outputText,
+            streaming: true,
+          })
+          return
+        }
+        if (event.type === 'algorithm_group' && event.group) {
+          groups.push(event.group)
+          // 文案只保留上方一条；工作流卡片不再重复 description
+          if (!outputText) {
+            outputText = event.group.description || event.group.name || t('chat.workflowReady')
+            patchLocalExtra(sessionId, streamTextId, {
+              content: outputText,
+              thinking: false,
+              streaming: true,
+            })
+          }
+          const localId = `local-workflow-${event.group.id || Date.now()}-${groups.length}`
+          localWorkflowIds.push(localId)
+          pushLocalExtra(sessionId, {
+            id: localId,
+            role: 'assistant',
+            type: 'workflow',
+            group: event.group,
+          })
+          return
+        }
+        if (event.type === 'error') {
+          streamError = event.error || t('chat.llmFailed')
+        }
+      },
+    })
+
+    if (streamError) throw new Error(streamError)
+
+    if (!outputText && groups.length) {
+      outputText = groups.map((item) => item.description || item.name).filter(Boolean).join('\n') || t('chat.workflowReady')
+    }
+    if (!outputText && !groups.length) {
+      outputText = t('chat.emptyReply')
+    }
+
+    patchLocalExtra(sessionId, streamTextId, {
+      content: outputText,
+      thinking: false,
+      streaming: false,
+    })
+
+    try {
+      const saved = []
+      const systemMsg = await createSessionMessage(sessionId, {
+        content: outputText,
+        messageType: MESSAGE_TYPE_SYSTEM,
+        jobId: null,
+      })
+      saved.push(toUiMessage(systemMsg))
+
+      for (const group of groups) {
+        const payload = serializeAlgorithmGroupMessage(group)
+        if (!payload) continue
+        const groupMsg = await createSessionMessage(sessionId, {
+          content: payload,
+          messageType: MESSAGE_TYPE_SYSTEM,
+          jobId: null,
+        })
+        saved.push(toUiMessage(groupMsg))
+      }
+
+      removeLocalExtra(sessionId, streamTextId)
+      localWorkflowIds.forEach((id) => removeLocalExtra(sessionId, id))
+      streamTextId = ''
+      messages.value = [...messages.value, ...saved]
+    } catch {
+      patchLocalExtra(sessionId, streamTextId, { streaming: false, thinking: false })
+    }
+  } catch (error) {
+    if (sessionId && streamTextId) {
+      patchLocalExtra(sessionId, streamTextId, {
+        content: error?.message || t('chat.llmFailed'),
+        streaming: false,
+        thinking: false,
+        failed: true,
+      })
+    }
+    ElMessage.error(error?.message || t('chat.llmFailed'))
+  } finally {
+    sending.value = false
+  }
 }
 
-function findMessage(id) {
-  for (const session of sessions.value) {
-    const message = session.messages.find((item) => item.id === id)
-    if (message) return { session, message }
-  }
-  return null
+function findLocalExtra(id) {
+  const sessionId = activeId.value
+  if (!sessionId) return null
+  const list = localExtras.value[sessionId] || []
+  const index = list.findIndex((item) => item.id === id)
+  if (index < 0) return null
+  return { sessionId, index, message: list[index], list }
 }
 
 function updatePlot(id, patch) {
-  const found = findMessage(id)
-  if (found && !found.message.done) Object.assign(found.message.form, patch)
+  const found = findLocalExtra(id)
+  if (!found || found.message.done) return
+  const next = { ...found.message, form: { ...found.message.form, ...patch } }
+  const list = [...found.list]
+  list[found.index] = next
+  localExtras.value = { ...localExtras.value, [found.sessionId]: list }
 }
 
-function runPlot(id) {
-  const found = findMessage(id)
-  if (!found || found.message.done) return
-  found.message.done = true
-  const now = Date.now()
-  found.session.messages.push(
-    { id: now, role: 'user', ...plotChoice(found.message.form) },
-    { id: now + 1, role: 'assistant', type: 'result', result: plotResult(found.message.form) },
-  )
+async function onWorkflowRunStart(_workflowId, group) {
+  const sessionId = activeId.value
+  if (!sessionId) return
+  const payload = serializeWorkflowRunMessage(group)
+  if (!payload) return
+  try {
+    const saved = await createSessionMessage(sessionId, {
+      content: payload,
+      messageType: MESSAGE_TYPE_SYSTEM,
+      jobId: null,
+    })
+    messages.value = [...messages.value, toUiMessage(saved)]
+  } catch (error) {
+    if (error?.message) ElMessage.error(error.message)
+  }
 }
+
+async function onWorkflowOutputs(_workflowId, files) {
+  const sessionId = activeId.value
+  if (!sessionId || !Array.isArray(files) || !files.length) return
+  const localId = `local-outputs-${Date.now()}`
+  pushLocalExtra(sessionId, {
+    id: localId,
+    role: 'assistant',
+    type: 'outputs',
+    files,
+  })
+  try {
+    const saved = await createSessionMessage(sessionId, {
+      content: serializeWorkflowOutputsMessage(files),
+      messageType: MESSAGE_TYPE_SYSTEM,
+      jobId: null,
+    })
+    removeLocalExtra(sessionId, localId)
+    messages.value = [...messages.value, toUiMessage(saved)]
+  } catch (error) {
+    if (error?.message) ElMessage.error(error.message)
+  }
+}
+
+async function runPlot(id) {
+  const found = findLocalExtra(id)
+  if (!found || found.message.done || !activeId.value) return
+
+  const list = [...found.list]
+  list[found.index] = { ...found.message, done: true }
+  const now = Date.now()
+  list.push(
+    { id: `local-plot-choice-${now}`, role: 'user', ...plotChoice(found.message.form) },
+    { id: `local-plot-result-${now}`, role: 'assistant', type: 'result', result: plotResult(found.message.form) },
+  )
+  localExtras.value = { ...localExtras.value, [found.sessionId]: list }
+}
+
+onMounted(async () => {
+  await loadAllSessions()
+  if (sessions.value[0]) {
+    await selectSession(sessions.value[0].id)
+  }
+})
 </script>
 
 <template>
@@ -81,19 +524,25 @@ function runPlot(id) {
       :collapsed="collapsed"
       :sessions="sessions"
       :active-id="activeId"
+      :loading="loadingSessions"
       @toggle="collapsed = !collapsed"
       @create="createSession"
-      @select="activeId = $event"
+      @select="selectSession"
+      @rename="onRename"
+      @delete="onDelete"
     />
     <section class="chat">
       <ChatStage
-        :messages="messages"
+        :messages="displayMessages"
+        :loading="loadingMessages"
         @create="createSession"
         @expand="collapsed = !collapsed"
         @plot-update="updatePlot"
         @plot-run="runPlot"
+        @workflow-run-start="onWorkflowRunStart"
+        @workflow-outputs="onWorkflowOutputs"
       />
-      <ChatComposer v-model="draft" v-model:mode="mode" @send="send" />
+      <ChatComposer v-model="draft" :disabled="sending" @send="send" />
     </section>
   </div>
 </template>

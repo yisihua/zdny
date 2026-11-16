@@ -24,7 +24,13 @@ const emit = defineEmits(['close', 'cover', 'restore'])
         <button type="button" @click="emit('close')">{{ t('map.close') }}</button>
       </div>
     </header>
-    <SatelliteMap :file-name="file.fileName" :kind="file.ext" />
+    <SatelliteMap
+      :file-name="file.fileName"
+      :kind="file.ext"
+      :geojson="file.geojson || null"
+      :map-url="file.mapUrl || ''"
+      :wms-layer="file.wmsLayer || ''"
+    />
   </aside>
 </template>
 

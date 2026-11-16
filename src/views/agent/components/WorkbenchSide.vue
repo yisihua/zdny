@@ -1,19 +1,15 @@
 <script setup>
-import { ElMessage } from 'element-plus'
 import SessionList from './SessionList.vue'
 import { t } from '@/i18n'
 
 defineProps({
   collapsed: { type: Boolean, default: false },
   sessions: { type: Array, required: true },
-  activeId: { type: Number, default: null },
+  activeId: { type: String, default: null },
+  loading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['toggle', 'create', 'select'])
-
-function pending(key) {
-  ElMessage.info(t('agent.pending', { name: t(key) }))
-}
+const emit = defineEmits(['toggle', 'create', 'select', 'rename', 'delete'])
 </script>
 
 <template>
@@ -27,11 +23,14 @@ function pending(key) {
 
     <template v-if="!collapsed">
       <button type="button" class="create" @click="emit('create')">{{ t('agent.newSession') }}</button>
-      <div class="tools">
-        <button type="button" @click="pending('agent.model')">{{ t('agent.model') }}</button>
-        <button type="button" @click="pending('agent.files')">{{ t('agent.files') }}</button>
-      </div>
-      <SessionList :sessions="sessions" :active-id="activeId" @select="emit('select', $event)" />
+      <SessionList
+        :sessions="sessions"
+        :active-id="activeId"
+        :loading="loading"
+        @select="emit('select', $event)"
+        @rename="emit('rename', $event)"
+        @delete="emit('delete', $event)"
+      />
     </template>
   </aside>
 </template>
@@ -42,6 +41,9 @@ function pending(key) {
   flex-direction: column;
   gap: 14px;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   padding: 16px 14px;
   border-right: 1px solid rgba(140, 220, 175, 0.16);
   background: rgba(3, 22, 16, 0.72);
@@ -54,6 +56,7 @@ function pending(key) {
 
 .side-head {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -65,7 +68,6 @@ function pending(key) {
 }
 
 .icon,
-.tools button,
 .create {
   border: 1px solid rgba(140, 220, 175, 0.28);
   color: #e7fff4;
@@ -81,6 +83,7 @@ function pending(key) {
 }
 
 .create {
+  flex: 0 0 auto;
   height: 44px;
   border: none;
   border-radius: 12px;
@@ -88,16 +91,5 @@ function pending(key) {
   background: linear-gradient(90deg, #8cf0ae, #2fbf6a);
   font-size: 16px;
   font-weight: 700;
-}
-
-.tools {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.tools button {
-  height: 40px;
-  border-radius: 12px;
 }
 </style>

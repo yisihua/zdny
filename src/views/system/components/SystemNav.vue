@@ -10,6 +10,8 @@ defineEmits(['change'])
 const items = [
   { id: 'role', key: 'system.role' },
   { id: 'user', key: 'system.user' },
+  { id: 'team', key: 'system.team' },
+  { id: 'project', key: 'system.project' },
   { id: 'permission', key: 'system.permission' },
   { id: 'service', key: 'system.service' },
   { id: 'log', key: 'system.log' },

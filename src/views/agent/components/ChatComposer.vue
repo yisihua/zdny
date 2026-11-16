@@ -3,36 +3,30 @@ import { t } from '@/i18n'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
-  mode: { type: String, default: 'normal' },
+  disabled: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:modelValue', 'update:mode', 'send'])
-
-function changeMode(next) {
-  emit('update:mode', next)
-}
+const emit = defineEmits(['update:modelValue', 'send'])
 
 function submit() {
+  if (props.disabled) return
   emit('send', props.modelValue)
 }
 </script>
 
 <template>
   <form class="composer" @submit.prevent="submit">
-    <div class="modes">
-      <button type="button" :class="{ 'is-on': mode === 'expert' }" @click="changeMode('expert')">{{ t('agent.expert') }}</button>
-      <button type="button" :class="{ 'is-on': mode === 'normal' }" @click="changeMode('normal')">{{ t('agent.normal') }}</button>
-    </div>
     <textarea
       :value="modelValue"
       rows="3"
+      :disabled="disabled"
       :placeholder="t('agent.placeholder')"
       @input="emit('update:modelValue', $event.target.value)"
       @keydown.enter.exact.prevent="submit"
     ></textarea>
     <div class="bar">
       <button type="button" class="ghost" :title="t('agent.attachTip')">{{ t('agent.attach') }}</button>
-      <button type="submit" class="send" :title="t('agent.send')">{{ t('agent.send') }}</button>
+      <button type="submit" class="send" :disabled="disabled" :title="t('agent.send')">{{ t('agent.send') }}</button>
     </div>
   </form>
 </template>
@@ -40,6 +34,7 @@ function submit() {
 <style scoped>
 .composer {
   margin: 0 6% 18px;
+  margin-right: calc(6% + 10px);
   padding: 14px 14px 10px;
   border: 1px solid rgba(140, 220, 175, 0.28);
   border-radius: 16px;
@@ -47,13 +42,6 @@ function submit() {
   box-shadow: inset 0 0 24px rgba(40, 160, 110, 0.08);
 }
 
-.modes {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.modes button,
 .ghost,
 .send {
   border: 1px solid rgba(140, 220, 175, 0.28);
@@ -63,22 +51,9 @@ function submit() {
   cursor: pointer;
 }
 
-.modes button {
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 999px;
-  font-size: 13px;
-}
-
-.modes button.is-on {
-  border-color: transparent;
-  color: #042117;
-  background: linear-gradient(90deg, #7dffc3, #2fbf6a);
-}
-
 textarea {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 0;
   border: none;
   resize: none;
   color: #f3fff8;
@@ -103,6 +78,12 @@ textarea::placeholder {
   height: 36px;
   padding: 0 14px;
   border-radius: 999px;
+}
+
+.send:disabled,
+textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .send {

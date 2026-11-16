@@ -1,0 +1,254 @@
+.system-dialog-modal {
+  background: rgba(2, 12, 9, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.system-dialog.el-dialog {
+  border: 1px solid rgba(140, 220, 175, 0.28);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(12, 48, 36, 0.96), rgba(5, 24, 18, 0.98));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+}
+
+.system-dialog .el-dialog__header {
+  margin: 0;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid rgba(140, 220, 175, 0.14);
+}
+
+.system-dialog .el-dialog__title {
+  color: #f3fff8;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.system-dialog .el-dialog__headerbtn {
+  top: 18px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+}
+
+.system-dialog .el-dialog__headerbtn .el-dialog__close {
+  color: rgba(214, 245, 228, 0.72);
+}
+
+.system-dialog .el-dialog__headerbtn:hover .el-dialog__close {
+  color: #8dffc8;
+}
+
+.system-dialog .el-dialog__body {
+  padding: 16px 20px 8px;
+  color: #edfff6;
+}
+
+.system-dialog .el-dialog__footer {
+  padding: 12px 20px 18px;
+  border-top: 1px solid rgba(140, 220, 175, 0.14);
+}
+
+.system-dialog .system-form .el-form-item__label {
+  color: rgba(214, 245, 228, 0.78);
+  font-weight: 600;
+}
+
+.system-dialog .el-input__wrapper,
+.system-dialog .el-textarea__inner,
+.system-dialog .el-select__wrapper,
+.system-dialog .system-form .el-input__wrapper,
+.system-dialog .system-form .el-textarea__inner,
+.system-dialog .system-form .el-select__wrapper {
+  min-height: 36px;
+  border-radius: 8px;
+  color: #f3fff8;
+  background: rgba(3, 18, 14, 0.72);
+  box-shadow: 0 0 0 1px rgba(140, 220, 175, 0.32) inset;
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.system-dialog .el-input__wrapper:hover,
+.system-dialog .el-textarea__inner:hover,
+.system-dialog .el-select__wrapper:hover {
+  background: rgba(4, 26, 20, 0.88);
+  box-shadow: 0 0 0 1px rgba(140, 220, 175, 0.48) inset;
+}
+
+.system-dialog .el-input__wrapper.is-focus,
+.system-dialog .el-textarea__inner:focus,
+.system-dialog .el-select__wrapper.is-focused {
+  background: rgba(4, 28, 22, 0.92);
+  box-shadow: 0 0 0 1px #3dce7c inset, 0 0 0 3px rgba(61, 206, 124, 0.16);
+}
+
+.system-dialog .el-input.is-disabled .el-input__wrapper {
+  background: rgba(3, 18, 14, 0.42);
+  box-shadow: 0 0 0 1px rgba(140, 220, 175, 0.2) inset;
+  cursor: not-allowed;
+}
+
+.system-dialog .el-input.is-disabled .el-input__inner {
+  color: rgba(214, 245, 228, 0.62);
+  -webkit-text-fill-color: rgba(214, 245, 228, 0.62);
+}
+
+.system-dialog .el-input__inner,
+.system-dialog .el-textarea__inner,
+.system-dialog .el-select__placeholder,
+.system-dialog .el-select__selected-item {
+  color: #f3fff8;
+  color-scheme: dark;
+}
+
+.system-dialog .el-input__inner::placeholder,
+.system-dialog .el-textarea__inner::placeholder,
+.system-dialog .el-select__placeholder {
+  color: rgba(198, 224, 210, 0.5);
+}
+
+.system-dialog .el-input__prefix,
+.system-dialog .el-input__suffix,
+.system-dialog .el-input__password,
+.system-dialog .el-select__caret,
+.system-dialog .el-select__clear,
+.system-dialog .el-input__clear {
+  color: rgba(198, 232, 214, 0.78);
+}
+
+.system-dialog .el-select__caret:hover,
+.system-dialog .el-select__clear:hover,
+.system-dialog .el-input__clear:hover {
+  color: #8dffc8;
+}
+
+.system-dialog .el-input__count,
+.system-dialog .el-input__count-inner {
+  color: rgba(214, 245, 228, 0.48);
+  background: transparent;
+}
+
+.system-dialog .el-form-item__error {
+  color: #ff9b9b;
+}
+
+.system-dialog .el-switch__core {
+  background: rgba(8, 36, 28, 0.92);
+  border-color: rgba(140, 220, 175, 0.36);
+}
+
+.system-dialog .el-switch__core .el-switch__action {
+  background: #d8f5e6;
+}
+
+.system-dialog .el-switch.is-checked .el-switch__core {
+  background: #2fbf6a;
+  border-color: #2fbf6a;
+}
+
+.system-dialog .el-switch.is-checked .el-switch__core .el-switch__action {
+  background: #042117;
+}
+
+.system-dialog .ghost,
+.system-dialog .primary {
+  height: 36px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.system-dialog .ghost {
+  margin-right: 8px;
+  padding: 0 14px;
+  border: 1px solid rgba(140, 220, 175, 0.32);
+  color: #f3fff8;
+  background: rgba(3, 18, 14, 0.55);
+}
+
+.system-dialog .ghost:hover {
+  border-color: rgba(140, 220, 175, 0.5);
+  background: rgba(4, 26, 20, 0.75);
+}
+
+.system-dialog .primary {
+  padding: 0 14px;
+  border: none;
+  color: #042117;
+  background: linear-gradient(90deg, #8cf0ae, #2fbf6a);
+  font-weight: 700;
+}
+
+.system-dialog .primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.system-message-box {
+  border: 1px solid rgba(140, 220, 175, 0.28);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(12, 48, 36, 0.96), rgba(5, 24, 18, 0.98));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
+.system-message-box .el-message-box__title,
+.system-message-box .el-message-box__content,
+.system-message-box .el-message-box__status {
+  color: #edfff6;
+}
+
+.system-message-box .el-message-box__message {
+  color: rgba(231, 255, 244, 0.88);
+}
+
+.system-message-box .el-message-box__btns .el-button {
+  border-radius: 8px;
+  border-color: rgba(140, 220, 175, 0.32);
+  color: #f3fff8;
+  background: rgba(3, 18, 14, 0.55);
+}
+
+.system-message-box .el-message-box__btns .el-button--primary {
+  border: none;
+  color: #042117;
+  background: linear-gradient(90deg, #8cf0ae, #2fbf6a);
+  font-weight: 700;
+}
+
+.system-message-box .el-message-box__headerbtn .el-message-box__close {
+  color: rgba(214, 245, 228, 0.72);
+}
+
+.system-select-dropdown {
+  border: 1px solid rgba(140, 220, 175, 0.28) !important;
+  background: rgba(5, 24, 18, 0.98) !important;
+}
+
+.system-select-dropdown .el-select-dropdown__item {
+  color: #e7fff4;
+  background: transparent;
+}
+
+.system-select-dropdown .el-select-dropdown__item.is-hovering {
+  color: #e7fff4;
+  background: rgba(47, 191, 106, 0.18);
+}
+
+.system-select-dropdown .el-select-dropdown__item.is-selected {
+  color: #042117;
+  background: linear-gradient(90deg, #8cf0ae, #2fbf6a);
+  font-weight: 600;
+}
+
+.system-select-dropdown .el-select-dropdown__empty {
+  color: rgba(214, 245, 228, 0.55);
+}
+
+.system-select-dropdown .el-input__wrapper {
+  min-height: 32px;
+  background: rgba(3, 18, 14, 0.72);
+  box-shadow: 0 0 0 1px rgba(140, 220, 175, 0.32) inset;
+}
+
+.system-select-dropdown .el-input__inner {
+  color: #f3fff8;
+}

@@ -1,6 +1,7 @@
 <script setup>
 import { plotOptions, plotStages } from '../plot.js'
 import { t } from '@/i18n'
+import SelectMenu from '@/components/SelectMenu.vue'
 
 defineProps({
   form: { type: Object, required: true },
@@ -30,15 +31,15 @@ function patch(key, value) {
       </button>
     </div>
     <template v-if="form.stage === 'free'">
-      <label>{{ t('plot.folder') }}<select :value="form.folder" :disabled="done" @change="patch('folder', $event.target.value)"><option v-for="item in plotOptions.folder" :key="item">{{ item }}</option></select></label>
-      <label>{{ t('plot.pose') }}<select :value="form.pose" :disabled="done" @change="patch('pose', $event.target.value)"><option v-for="item in plotOptions.pose" :key="item.id" :value="item.id">{{ t(item.labelKey) }}</option></select></label>
-      <label>{{ t('plot.model') }}<select :value="form.model" :disabled="done" @change="patch('model', $event.target.value)"><option v-for="item in plotOptions.model" :key="item">{{ item }}</option></select></label>
+      <label>{{ t('plot.folder') }}<SelectMenu :model-value="form.folder" :options="plotOptions.folder" :disabled="done" @update:model-value="patch('folder', $event)" /></label>
+      <label>{{ t('plot.pose') }}<SelectMenu :model-value="form.pose" :options="plotOptions.pose.map((item) => ({ value: item.id, label: t(item.labelKey) }))" :disabled="done" @update:model-value="patch('pose', $event)" /></label>
+      <label>{{ t('plot.model') }}<SelectMenu :model-value="form.model" :options="plotOptions.model" :disabled="done" @update:model-value="patch('model', $event)" /></label>
     </template>
     <template v-else>
-      <label>{{ t('plot.source') }}<select :value="form.source" :disabled="done" @change="patch('source', $event.target.value)"><option v-for="item in plotOptions.source" :key="item.id" :value="item.id">{{ t(item.labelKey) }}</option></select></label>
-      <label>{{ t('plot.shp') }}<select :value="form.shp" :disabled="done" @change="patch('shp', $event.target.value)"><option v-for="item in plotOptions.shp" :key="item">{{ item }}</option></select></label>
-      <label v-if="form.source === 'both'">{{ t('plot.tif') }}<select :value="form.tif" :disabled="done" @change="patch('tif', $event.target.value)"><option v-for="item in plotOptions.tif" :key="item">{{ item }}</option></select></label>
-      <label>{{ t('plot.quality') }}<select :value="form.quality" :disabled="done" @change="patch('quality', $event.target.value)"><option v-for="item in plotOptions.quality" :key="item">{{ item }}</option></select></label>
+      <label>{{ t('plot.source') }}<SelectMenu :model-value="form.source" :options="plotOptions.source.map((item) => ({ value: item.id, label: t(item.labelKey) }))" :disabled="done" @update:model-value="patch('source', $event)" /></label>
+      <label>{{ t('plot.shp') }}<SelectMenu :model-value="form.shp" :options="plotOptions.shp" :disabled="done" @update:model-value="patch('shp', $event)" /></label>
+      <label v-if="form.source === 'both'">{{ t('plot.tif') }}<SelectMenu :model-value="form.tif" :options="plotOptions.tif" :disabled="done" @update:model-value="patch('tif', $event)" /></label>
+      <label>{{ t('plot.quality') }}<SelectMenu :model-value="form.quality" :options="plotOptions.quality" :disabled="done" @update:model-value="patch('quality', $event)" /></label>
     </template>
     <button type="button" class="run" :disabled="done" @click="emit('run')">{{ done ? t('plot.ran') : t('plot.run') }}</button>
   </div>
@@ -66,7 +67,6 @@ label {
   color: rgba(214, 245, 228, 0.72);
 }
 
-select,
 button {
   height: 34px;
   border: 1px solid rgba(140, 220, 175, 0.32);
@@ -74,11 +74,6 @@ button {
   color: #f3fff8;
   background: rgba(3, 18, 14, 0.55);
   font: inherit;
-}
-
-select {
-  min-width: 180px;
-  padding: 0 8px;
 }
 
 .stages button {

@@ -4,14 +4,43 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight, Lock, RefreshRight, User } from '@element-plus/icons-vue'
 import LangSwitch from '@/components/LangSwitch.vue'
+import { forgotPassword, getCaptcha, getCurrentUser, login, resetPassword } from '@/api/auth'
 import { locale, t } from '@/i18n'
+import { sanitizeRedirect } from '@/router/redirect'
 
 const router = useRouter()
 const route = useRoute()
 const formRef = ref()
-const captchaCode = ref('')
+const forgotFormRef = ref()
+const resetFormRef = ref()
 const docVisible = ref(false)
 const docKey = ref('')
+const forgotVisible = ref(false)
+const forgotStep = ref('verify')
+const submitting = ref(false)
+const captchaLoading = ref(false)
+const forgotCaptchaLoading = ref(false)
+const resetToken = ref('')
+const serverCaptcha = reactive({
+  id: '',
+  image: '',
+})
+const forgotCaptcha = reactive({
+  id: '',
+  image: '',
+})
+
+const forgotForm = reactive({
+  username: '',
+  captchaAnswer: '',
+})
+
+const resetForm = reactive({
+  securityQuestion: '',
+  securityAnswer: '',
+  newPassword: '',
+  confirmPassword: '',
+})
 
 const motes = [
   { left: '6%', size: '2px', delay: '0s', duration: '13s' },
@@ -41,47 +70,219 @@ const rules = computed(() => ({
   captcha: [{ required: true, message: t('login.captchaRequired'), trigger: 'blur' }],
 }))
 
-function createCaptcha() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  captchaCode.value = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+const forgotRules = computed(() => ({
+  username: [{ required: true, message: t('login.userRequired'), trigger: 'blur' }],
+  captchaAnswer: [{ required: true, message: t('login.captchaRequired'), trigger: 'blur' }],
+}))
+
+const resetRules = computed(() => ({
+  securityAnswer: [
+    { required: true, message: t('login.securityAnswerRequired'), trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        if (String(value || '').trim().length > 128) {
+          callback(new Error(t('login.fieldLong')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  newPassword: [
+    { required: true, message: t('login.passwordRequired'), trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        const password = String(value || '')
+        if (password.length < 8 || password.length > 72 || new TextEncoder().encode(password).length > 72) {
+          callback(new Error(t('login.passwordRule')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  confirmPassword: [
+    { required: true, message: t('login.passwordConfirm'), trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        if (value !== resetForm.newPassword) {
+          callback(new Error(t('login.passwordMismatch')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+}))
+
+const forgotDialogTitle = computed(() =>
+  forgotStep.value === 'reset' ? t('login.resetTitle') : t('login.forgotTitle'),
+)
+
+function captchaSrc(imageBase64) {
+  if (!imageBase64) return ''
+  if (String(imageBase64).startsWith('data:')) return imageBase64
+  return `data:image/png;base64,${imageBase64}`
 }
 
-function refreshCaptcha() {
-  createCaptcha()
-  form.captcha = ''
+async function loadCaptcha() {
+  if (captchaLoading.value) return
+  captchaLoading.value = true
+  try {
+    const data = await getCaptcha()
+    serverCaptcha.id = data?.captchaId ? String(data.captchaId) : ''
+    serverCaptcha.image = captchaSrc(data?.imageBase64)
+    form.captcha = ''
+  } catch {
+    serverCaptcha.id = ''
+    serverCaptcha.image = ''
+  } finally {
+    captchaLoading.value = false
+  }
 }
 
-function captchaStyle(index) {
-  const colors = ['#1a6840', '#123c28', '#248a52', '#0f4d32']
-  const rotates = [-10, 7, -4, 11]
-  return {
-    color: colors[index],
-    transform: `rotate(${rotates[index]}deg)`,
+async function loadForgotCaptcha() {
+  if (forgotCaptchaLoading.value) return
+  forgotCaptchaLoading.value = true
+  try {
+    const data = await getCaptcha()
+    forgotCaptcha.id = data?.captchaId ? String(data.captchaId) : ''
+    forgotCaptcha.image = captchaSrc(data?.imageBase64)
+    forgotForm.captchaAnswer = ''
+  } catch {
+    forgotCaptcha.id = ''
+    forgotCaptcha.image = ''
+  } finally {
+    forgotCaptchaLoading.value = false
   }
 }
 
 async function onSubmit() {
   const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
-  if (form.captcha.trim().toLowerCase() !== captchaCode.value.toLowerCase()) {
-    ElMessage.error(t('login.captchaBad'))
-    refreshCaptcha()
-    return
-  }
+  if (!valid || submitting.value) return
   if (!form.agreed) {
     ElMessage.warning(t('login.agreeRequired'))
     return
   }
-  const username = form.username.trim()
-  localStorage.setItem('username', username)
-  localStorage.setItem('token', 'demo-token')
-  ElMessage.success(t('login.ok'))
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  router.push(redirect)
+  if (!serverCaptcha.id) {
+    ElMessage.warning(t('login.captchaRequired'))
+    await loadCaptcha()
+    return
+  }
+
+  submitting.value = true
+  try {
+    const data = await login({
+      username: form.username.trim(),
+      password: form.password,
+      captchaId: serverCaptcha.id,
+      captchaAnswer: form.captcha.trim(),
+    })
+    const username = data?.username ? String(data.username) : form.username.trim()
+    localStorage.setItem('token', data?.token ? String(data.token) : '')
+    localStorage.setItem('username', username)
+    if (data?.userId != null) localStorage.setItem('userId', String(data.userId))
+    if (data?.expiresAt) localStorage.setItem('expiresAt', String(data.expiresAt))
+
+    try {
+      const me = await getCurrentUser()
+      if (me) localStorage.setItem('user', JSON.stringify(me))
+    } catch {
+      // Token 已保存；资料拉取失败不阻断进入系统
+    }
+
+    ElMessage.success(t('login.ok'))
+    const redirect = sanitizeRedirect(
+      typeof route.query.redirect === 'string' ? route.query.redirect : '',
+    )
+    router.replace(redirect || '/agent')
+
+  } catch {
+    await loadCaptcha()
+  } finally {
+    submitting.value = false
+  }
 }
 
-function onForgot() {
-  ElMessage.info(t('login.forgotTip'))
+async function openForgot() {
+  forgotStep.value = 'verify'
+  resetToken.value = ''
+  forgotForm.username = form.username.trim()
+  forgotForm.captchaAnswer = ''
+  resetForm.securityQuestion = ''
+  resetForm.securityAnswer = ''
+  resetForm.newPassword = ''
+  resetForm.confirmPassword = ''
+  forgotVisible.value = true
+  await loadForgotCaptcha()
+}
+
+function closeForgot() {
+  forgotVisible.value = false
+  forgotStep.value = 'verify'
+  resetToken.value = ''
+  forgotFormRef.value?.resetFields?.()
+  resetFormRef.value?.resetFields?.()
+}
+
+async function submitForgot() {
+  const valid = await forgotFormRef.value?.validate().catch(() => false)
+  if (!valid || submitting.value) return
+  if (!forgotCaptcha.id) {
+    ElMessage.warning(t('login.captchaRequired'))
+    await loadForgotCaptcha()
+    return
+  }
+
+  submitting.value = true
+  try {
+    const data = await forgotPassword({
+      username: forgotForm.username.trim(),
+      captchaId: forgotCaptcha.id,
+      captchaAnswer: forgotForm.captchaAnswer.trim(),
+    })
+    resetToken.value = data?.token ? String(data.token) : ''
+    resetForm.securityQuestion = data?.securityQuestion || ''
+    resetForm.securityAnswer = ''
+    resetForm.newPassword = ''
+    resetForm.confirmPassword = ''
+    forgotStep.value = 'reset'
+  } catch {
+    await loadForgotCaptcha()
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function submitReset() {
+  const valid = await resetFormRef.value?.validate().catch(() => false)
+  if (!valid || submitting.value) return
+  if (!resetToken.value) {
+    ElMessage.warning(t('login.forgotHint'))
+    forgotStep.value = 'verify'
+    await loadForgotCaptcha()
+    return
+  }
+
+  submitting.value = true
+  try {
+    await resetPassword({
+      token: resetToken.value,
+      securityAnswer: resetForm.securityAnswer.trim(),
+      newPassword: resetForm.newPassword,
+    })
+    form.username = forgotForm.username.trim()
+    ElMessage.success(t('login.resetOk'))
+    closeForgot()
+    await loadCaptcha()
+  } catch {
+    // 凭证可能仍有效；锁定或失效时由接口提示
+  } finally {
+    submitting.value = false
+  }
 }
 
 function onRegister() {
@@ -93,7 +294,7 @@ function openDoc(key) {
   docVisible.value = true
 }
 
-createCaptcha()
+loadCaptcha()
 </script>
 
 <template>
@@ -164,7 +365,12 @@ createCaptcha()
 
           <el-form-item prop="captcha">
             <div class="captcha-row">
-              <el-input v-model="form.captcha" :placeholder="t('login.captcha')" maxlength="4">
+              <el-input
+                v-model="form.captcha"
+                :placeholder="t('login.captchaAnswer')"
+                maxlength="16"
+                autocomplete="off"
+              >
                 <template #prefix>
                   <svg class="shield" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path
@@ -177,12 +383,10 @@ createCaptcha()
                   </svg>
                 </template>
               </el-input>
-              <button type="button" class="captcha" :title="t('login.captchaRefresh')" @click="refreshCaptcha">
-                <span v-for="(char, index) in captchaCode" :key="index" :style="captchaStyle(index)">
-                  {{ char }}
-                </span>
+              <button type="button" class="captcha captcha-image" :title="t('login.captchaRefresh')" @click="loadCaptcha">
+                <img v-if="serverCaptcha.image" :src="serverCaptcha.image" alt="" />
               </button>
-              <button type="button" class="refresh" :title="t('login.captchaRefresh')" @click="refreshCaptcha">
+              <button type="button" class="refresh" :title="t('login.captchaRefresh')" @click="loadCaptcha">
                 <el-icon><RefreshRight /></el-icon>
               </button>
             </div>
@@ -198,19 +402,133 @@ createCaptcha()
             </span>
           </div>
 
-          <button class="submit" type="submit">
+          <button class="submit" type="submit" :disabled="submitting">
             <span>{{ t('login.submit') }}</span>
             <el-icon><ArrowRight /></el-icon>
           </button>
 
           <div class="action-row">
             <button type="button" class="ghost" @click="onRegister">{{ t('login.register') }}</button>
-            <button type="button" class="ghost" @click="onForgot">{{ t('login.forgot') }}</button>
+            <button type="button" class="ghost" @click="openForgot">{{ t('login.forgot') }}</button>
           </div>
         </el-form>
 
         <el-dialog v-model="docVisible" :title="t(docKey === 'privacy' ? 'login.privacy' : 'login.service')" width="480px" append-to-body>
           <p class="doc-text">{{ t(docKey === 'privacy' ? 'login.privacyText' : 'login.serviceText') }}</p>
+        </el-dialog>
+
+        <el-dialog
+          v-model="forgotVisible"
+          class="login-dialog"
+          modal-class="login-dialog-modal"
+          :title="forgotDialogTitle"
+          width="480px"
+          append-to-body
+          destroy-on-close
+          align-center
+          @closed="closeForgot"
+        >
+          <el-form
+            v-if="forgotStep === 'verify'"
+            ref="forgotFormRef"
+            class="login-form"
+            :model="forgotForm"
+            :rules="forgotRules"
+            label-position="top"
+            @submit.prevent="submitForgot"
+          >
+            <p class="dialog-hint">{{ t('login.forgotHint') }}</p>
+            <el-form-item :label="t('login.user')" prop="username" required>
+              <el-input v-model="forgotForm.username" maxlength="64" :placeholder="t('login.user')" autocomplete="username">
+                <template #prefix>
+                  <el-icon><User /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item :label="t('login.captchaAnswer')" prop="captchaAnswer" required>
+              <div class="captcha-row">
+                <el-input
+                  v-model="forgotForm.captchaAnswer"
+                  maxlength="16"
+                  :placeholder="t('login.captchaAnswer')"
+                  autocomplete="off"
+                />
+                <button type="button" class="captcha captcha-image" :title="t('login.captchaRefresh')" @click="loadForgotCaptcha">
+                  <img v-if="forgotCaptcha.image" :src="forgotCaptcha.image" alt="" />
+                </button>
+                <button type="button" class="refresh" :title="t('login.captchaRefresh')" @click="loadForgotCaptcha">
+                  <el-icon><RefreshRight /></el-icon>
+                </button>
+              </div>
+            </el-form-item>
+          </el-form>
+
+          <el-form
+            v-else
+            ref="resetFormRef"
+            class="login-form"
+            :model="resetForm"
+            :rules="resetRules"
+            label-position="top"
+            @submit.prevent="submitReset"
+          >
+            <div class="question">
+              <span>{{ t('login.securityQuestion') }}</span>
+              {{ resetForm.securityQuestion }}
+            </div>
+            <el-form-item :label="t('login.securityAnswer')" prop="securityAnswer" required>
+              <el-input
+                v-model="resetForm.securityAnswer"
+                maxlength="128"
+                :placeholder="t('login.securityAnswer')"
+                autocomplete="off"
+              />
+            </el-form-item>
+            <el-form-item :label="t('login.newPassword')" prop="newPassword" required>
+              <el-input
+                v-model="resetForm.newPassword"
+                type="password"
+                show-password
+                maxlength="72"
+                :placeholder="t('login.newPassword')"
+                autocomplete="new-password"
+              >
+                <template #prefix>
+                  <el-icon><Lock /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item :label="t('login.passwordConfirm')" prop="confirmPassword" required>
+              <el-input
+                v-model="resetForm.confirmPassword"
+                type="password"
+                show-password
+                maxlength="72"
+                :placeholder="t('login.passwordConfirm')"
+                autocomplete="new-password"
+              >
+                <template #prefix>
+                  <el-icon><Lock /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+          </el-form>
+
+          <template #footer>
+            <button type="button" class="ghost" @click="closeForgot">{{ t('login.cancel') }}</button>
+            <button
+              v-if="forgotStep === 'verify'"
+              type="button"
+              class="primary"
+              :disabled="submitting"
+              @click="submitForgot"
+            >
+              {{ t('login.forgotSubmit') }}
+            </button>
+            <button v-else type="button" class="primary" :disabled="submitting" @click="submitReset">
+              {{ t('login.resetSubmit') }}
+            </button>
+          </template>
         </el-dialog>
       </section>
     </div>
@@ -473,27 +791,23 @@ h1 {
 
 .captcha {
   display: flex;
-  flex: 0 0 84px;
+  flex: 0 0 112px;
   align-items: center;
   justify-content: center;
   height: 44px;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 8px;
-  background: linear-gradient(180deg, #f7fff9, #d7f6e4);
+  background: #f7fff9;
   user-select: none;
 }
 
-.captcha span {
-  display: inline-block;
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: 20px;
-  font-weight: 800;
-  animation: flicker 2.6s ease-in-out infinite;
+.captcha-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
-
-.captcha span:nth-child(2) { animation-delay: 0.25s; }
-.captcha span:nth-child(3) { animation-delay: 0.5s; }
-.captcha span:nth-child(4) { animation-delay: 0.75s; }
 
 .refresh {
   display: grid;
@@ -594,6 +908,11 @@ h1 {
   filter: brightness(1.06);
 }
 
+.submit:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .submit:hover .el-icon {
   transform: translateX(4px);
 }
@@ -673,7 +992,6 @@ h1 {
   .brand-logo svg,
   .panel,
   .panel::before,
-  .captcha span,
   .submit::before {
     animation: none;
   }
@@ -694,5 +1012,192 @@ h1 {
   .panel {
     width: min(440px, 100%);
   }
+}
+</style>
+
+<style>
+.login-dialog-modal {
+  background: rgba(2, 12, 9, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.login-dialog.el-dialog {
+  border: 1px solid rgba(128, 214, 168, 0.38);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(12, 58, 42, 0.96), rgba(7, 36, 27, 0.98));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+}
+
+.login-dialog .el-dialog__header {
+  margin: 0;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid rgba(140, 220, 175, 0.14);
+}
+
+.login-dialog .el-dialog__title {
+  color: #f3fff8;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.login-dialog .el-dialog__headerbtn {
+  top: 18px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+}
+
+.login-dialog .el-dialog__headerbtn .el-dialog__close {
+  color: rgba(214, 245, 228, 0.72);
+}
+
+.login-dialog .el-dialog__headerbtn:hover .el-dialog__close {
+  color: #8dffc8;
+}
+
+.login-dialog .el-dialog__body {
+  padding: 16px 20px 8px;
+  color: #edfff6;
+}
+
+.login-dialog .el-dialog__footer {
+  padding: 12px 20px 18px;
+  border-top: 1px solid rgba(140, 220, 175, 0.14);
+}
+
+.login-dialog .dialog-hint {
+  margin: 0 0 14px;
+  color: rgba(214, 236, 224, 0.72);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.login-dialog .question {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(138, 214, 176, 0.32);
+  border-radius: 8px;
+  background: rgba(3, 22, 16, 0.35);
+  color: #f3fff8;
+  line-height: 1.6;
+}
+
+.login-dialog .question span {
+  display: block;
+  margin-bottom: 4px;
+  color: rgba(214, 236, 224, 0.62);
+  font-size: 12px;
+}
+
+.login-dialog .login-form .el-form-item__label {
+  color: rgba(214, 245, 228, 0.78);
+  font-weight: 600;
+}
+
+.login-dialog .login-form .el-input__wrapper {
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(3, 22, 16, 0.45);
+  box-shadow: 0 0 0 1px rgba(138, 214, 176, 0.32) inset;
+}
+
+.login-dialog .login-form .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #3dce7c inset, 0 0 0 3px rgba(61, 206, 124, 0.16);
+}
+
+.login-dialog .login-form .el-input__inner {
+  color: #f3fff8;
+  color-scheme: dark;
+}
+
+.login-dialog .login-form .el-input__inner::placeholder {
+  color: rgba(198, 224, 210, 0.55);
+}
+
+.login-dialog .login-form .el-input__prefix,
+.login-dialog .login-form .el-input__suffix,
+.login-dialog .login-form .el-input__password {
+  color: rgba(198, 232, 214, 0.8);
+}
+
+.login-dialog .login-form .el-form-item__error {
+  color: #ff9b9b;
+}
+
+.login-dialog .captcha-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.login-dialog .captcha-row .el-input {
+  flex: 1;
+}
+
+.login-dialog .captcha {
+  display: flex;
+  flex: 0 0 112px;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+  background: #f7fff9;
+  cursor: pointer;
+}
+
+.login-dialog .captcha img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.login-dialog .refresh {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  color: rgba(214, 240, 224, 0.85);
+  background: transparent;
+  cursor: pointer;
+}
+
+.login-dialog .refresh:hover {
+  color: #fff;
+}
+
+.login-dialog .ghost,
+.login-dialog .primary {
+  height: 40px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.login-dialog .ghost {
+  margin-right: 8px;
+  padding: 0 16px;
+  border: 1px solid rgba(138, 214, 176, 0.45);
+  color: #e7fff4;
+  background: rgba(4, 28, 20, 0.35);
+}
+
+.login-dialog .primary {
+  padding: 0 16px;
+  border: none;
+  color: #042117;
+  background: linear-gradient(90deg, #67e48c 0%, #3ad7a8 46%, #24d0c8 100%);
+  font-weight: 700;
+}
+
+.login-dialog .primary:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 </style>

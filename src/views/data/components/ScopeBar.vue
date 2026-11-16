@@ -8,8 +8,8 @@ defineProps({
 defineEmits(['change'])
 
 const items = [
-  { id: 'personal', key: 'data.personal' },
-  { id: 'public', key: 'data.public' },
+  { id: 'personal', key: 'data.mine' },
+  { id: 'public', key: 'data.shared' },
 ]
 </script>
 

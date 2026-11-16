@@ -39,10 +39,13 @@ function download(file) {
     <h3>{{ t(result.titleKey) }}</h3>
     <ul class="files">
       <li v-for="file in result.files" :key="file.name">
+        <em>{{ file.ext }}</em>
         <span>{{ file.name }}</span>
-        <button v-if="file.ext === 'PDF'" type="button" @click="openPdf(file)">{{ t('plot.open') }}</button>
-        <button v-if="file.ext === 'SHP' || file.ext === 'TIF'" type="button" @click="load(file)">{{ t('plot.map') }}</button>
-        <button type="button" @click="download(file)">{{ t('plot.download') }}</button>
+        <div class="ops">
+          <button v-if="file.ext === 'PDF'" type="button" class="primary" @click="openPdf(file)">{{ t('plot.open') }}</button>
+          <button v-if="file.ext === 'SHP' || file.ext === 'TIF'" type="button" class="primary" @click="load(file)">{{ t('plot.map') }}</button>
+          <button type="button" @click="download(file)">{{ t('plot.download') }}</button>
+        </div>
       </li>
     </ul>
     <p class="note">{{ t('plot.note') }}</p>
@@ -66,6 +69,7 @@ p {
 
 h3 {
   font-size: 16px;
+  letter-spacing: 0.02em;
 }
 
 .files {
@@ -77,27 +81,64 @@ h3 {
 }
 
 .files li {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 8px 8px 8px 10px;
+  border: 1px solid rgba(140, 220, 175, 0.16);
+  border-radius: 10px;
+  background: rgba(8, 36, 28, 0.55);
+}
+
+.files em {
+  width: 72px;
+  padding: 2px 0;
+  border-radius: 6px;
+  color: #8cf0ae;
+  background: rgba(47, 191, 106, 0.14);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
 }
 
 .files span {
   min-width: 0;
-  margin-right: auto;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops {
+  display: flex;
+  gap: 6px;
 }
 
 button {
   height: 28px;
   padding: 0 10px;
-  border: 1px solid rgba(140, 220, 175, 0.32);
+  border: 1px solid rgba(140, 220, 175, 0.28);
   border-radius: 8px;
-  color: #e7fff4;
+  color: #d8ffe9;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+button:hover {
+  border-color: rgba(140, 240, 174, 0.7);
+}
+
+.primary {
+  border-color: transparent;
+  color: #042117;
+  background: linear-gradient(90deg, #8cf0ae, #2fbf6a);
+  font-weight: 700;
 }
 
 .note {
