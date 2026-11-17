@@ -135,24 +135,54 @@ function logout() {
 .nav {
   display: flex;
   flex: 1;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   min-width: 0;
 }
 
 .nav a {
-  padding: 6px 12px;
-  border-radius: 8px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   color: rgba(214, 245, 228, 0.78);
-  font-size: 14px;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
   text-decoration: none;
   white-space: nowrap;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.nav a:hover,
+.nav a:hover {
+  color: #edfff6;
+  border-color: rgba(140, 220, 175, 0.28);
+  background: rgba(61, 206, 124, 0.14);
+}
+
 .nav a.is-active {
-  color: #fff;
-  background: rgba(61, 206, 124, 0.28);
+  color: #042117;
+  border-color: transparent;
+  background: linear-gradient(180deg, #8cf0ae, #2fbf6a);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 6px 16px rgba(20, 120, 70, 0.28);
+}
+
+.nav a.is-active:hover {
+  color: #042117;
+  border-color: transparent;
+  filter: brightness(1.04);
 }
 
 .user {

@@ -233,15 +233,15 @@ onBeforeUnmount(() => {
 }
 
 .module {
-  width: min(240px, 100%);
+  width: min(320px, 100%);
 }
 
 .card {
   display: grid;
   gap: 8px;
   width: 100%;
-  min-height: 64px;
-  padding: 10px 12px;
+  min-height: 56px;
+  padding: 8px 10px;
   border: 1px solid rgba(140, 220, 175, 0.28);
   border-radius: 12px;
   color: #edfff6;
@@ -265,20 +265,24 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
-strong,
-small {
+strong {
   overflow: hidden;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-strong {
-  font-size: 14px;
-}
-
 small {
+  display: -webkit-box;
+  overflow: hidden;
   color: rgba(214, 245, 228, 0.68);
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .pct {
@@ -653,15 +657,15 @@ small {
 
 .row {
   --gap: 12px;
+  --col: 320px;
   --line: rgba(160, 230, 190, 0.8);
   position: relative;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(180px, 1fr);
+  grid-auto-columns: var(--col);
   gap: var(--gap);
   align-items: start;
   width: max-content;
-  min-width: 100%;
 }
 
 .row > :deep(.branch) {

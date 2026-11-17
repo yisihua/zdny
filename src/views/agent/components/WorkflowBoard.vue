@@ -422,13 +422,14 @@ small {
 /* 由上一级并行节点汇合到汇总卡片 */
 .merge {
   --gap: 12px;
+  --col: 320px;
   --line: rgba(160, 230, 190, 0.8);
   position: relative;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(180px, 1fr);
+  grid-auto-columns: var(--col);
   gap: var(--gap);
-  width: 100%;
+  width: max-content;
   min-height: 40px;
   margin-top: 2px;
   margin-bottom: 8px;
@@ -497,10 +498,10 @@ small {
 
 .card {
   display: grid;
-  gap: 8px;
-  width: min(280px, 100%);
-  min-height: 64px;
-  padding: 10px 12px;
+  gap: 6px;
+  width: min(320px, 100%);
+  min-height: 56px;
+  padding: 8px 10px;
   border: 1px solid rgba(140, 220, 175, 0.28);
   border-radius: 12px;
   color: #edfff6;
@@ -521,15 +522,24 @@ small {
   flex: 1;
 }
 
-.card strong,
-.card small {
+.card strong {
   overflow: hidden;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.card strong {
-  font-size: 14px;
+.card small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(214, 245, 228, 0.68);
+  font-size: 10px;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .card .pct {
