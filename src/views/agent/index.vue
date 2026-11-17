@@ -476,18 +476,35 @@ async function onWorkflowRunStart(_workflowId, group) {
 async function onWorkflowOutputs(_workflowId, files) {
   const sessionId = activeId.value
   if (!sessionId || !Array.isArray(files) || !files.length) return
+  // 整包保存：files 展示项 + imports 接口原始回调
+  const content = serializeWorkflowOutputsMessage({
+    files,
+    imports: Array.isArray(files.imports) ? files.imports : undefined,
+  })
+  const savedFiles = parseWorkflowOutputsMessage(content) || files
   const localId = `local-outputs-${Date.now()}`
   pushLocalExtra(sessionId, {
     id: localId,
     role: 'assistant',
     type: 'outputs',
-    files,
+    files: savedFiles,
   })
   try {
     const saved = await createSessionMessage(sessionId, {
-      content: serializeWorkflowOutputsMessage(files),
+      content,
       messageType: MESSAGE_TYPE_SYSTEM,
       jobId: null,
+    })
+    console.debug('[workflow-outputs] saved message', {
+      messageId: saved?.id,
+      files: savedFiles.map((item) => ({
+        name: item.name,
+        id: item.id,
+        mapUrl: item.mapUrl,
+        wmsUrl: item.wmsUrl,
+        fileUrl: item.fileUrl,
+        uploadOk: item.uploadOk,
+      })),
     })
     removeLocalExtra(sessionId, localId)
     messages.value = [...messages.value, toUiMessage(saved)]

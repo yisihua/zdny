@@ -1,25 +1,102 @@
 <script setup>
-import { provide, ref, watch } from 'vue'
+import { computed, provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppHead from '@/components/head/index.vue'
 import MapPanel from '@/components/map/MapPanel.vue'
 import { mapPanelKey } from '@/components/map/context.js'
 
 const route = useRoute()
-const file = ref(null)
+const layers = ref([])
 const cover = ref(false)
+const fitLayerId = ref('')
+
+const mapOpen = computed(() => layers.value.length > 0)
+
+function layerDupeKey(item) {
+  if (item?.wmsUrl) return `wms:${item.wmsUrl}`
+  if (item?.mapUrl) return `map:${item.mapUrl}`
+  if (item?.geojson) return `geojson:${item.fileName || ''}:${item.ext || ''}`
+  return `file:${item?.id || item?.fileName || ''}`
+}
 
 function openMap(next) {
-  file.value = next
+  if (!next) return
+  const key = layerDupeKey(next)
+  const existing = layers.value.find((item) => layerDupeKey(item) === key)
+  if (existing) {
+    fitLayerId.value = existing.id
+    cover.value = false
+    return
+  }
+
+  const id = String(next.id || next.layerId || `layer-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
+  layers.value = [
+    ...layers.value,
+    {
+      id,
+      fileName: next.fileName || next.name || 'layer',
+      ext: next.ext || '',
+      geojson: next.geojson || null,
+      mapUrl: next.mapUrl || '',
+      wmsUrl: next.wmsUrl || '',
+      wmsLayer: next.wmsLayer || '',
+      visible: true,
+    },
+  ]
+  fitLayerId.value = id
   cover.value = false
 }
 
 function closeMap() {
-  file.value = null
+  layers.value = []
+  fitLayerId.value = ''
   cover.value = false
 }
 
-provide(mapPanelKey, { file, openMap, closeMap })
+function removeLayer(id) {
+  layers.value = layers.value.filter((item) => item.id !== id)
+  if (!layers.value.length) {
+    closeMap()
+    return
+  }
+  if (fitLayerId.value === id) fitLayerId.value = layers.value[layers.value.length - 1]?.id || ''
+}
+
+function setLayerVisible(id, visible) {
+  layers.value = layers.value.map((item) =>
+    item.id === id ? { ...item, visible: Boolean(visible) } : item,
+  )
+}
+
+function moveLayer(id, direction) {
+  const list = [...layers.value]
+  const index = list.findIndex((item) => item.id === id)
+  if (index < 0) return
+  const target = direction === 'up' ? index + 1 : index - 1
+  if (target < 0 || target >= list.length) return
+  const tmp = list[index]
+  list[index] = list[target]
+  list[target] = tmp
+  layers.value = list
+}
+
+function fitLayer(id) {
+  if (!id) return
+  fitLayerId.value = ''
+  requestAnimationFrame(() => {
+    fitLayerId.value = id
+  })
+}
+
+provide(mapPanelKey, {
+  layers,
+  openMap,
+  closeMap,
+  removeLayer,
+  setLayerVisible,
+  moveLayer,
+  fitLayer,
+})
 
 watch(() => route.path, closeMap)
 </script>
@@ -32,12 +109,17 @@ watch(() => route.path, closeMap)
         <router-view />
       </main>
       <MapPanel
-        v-if="file"
-        :file="file"
+        v-if="mapOpen"
+        :layers="layers"
+        :fit-layer-id="fitLayerId"
         :cover="cover"
         @close="closeMap"
         @cover="cover = true"
         @restore="cover = false"
+        @remove-layer="removeLayer"
+        @toggle-layer="({ id, visible }) => setLayerVisible(id, visible)"
+        @move-layer="({ id, direction }) => moveLayer(id, direction)"
+        @fit-layer="fitLayer"
       />
     </div>
   </div>

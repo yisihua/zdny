@@ -26,6 +26,17 @@ function mockApi() {
   }
 }
 
+/** http://10.202.210.30:32860/geoserver → 代理目标 http://10.202.210.30:32860 */
+function geoserverProxyTarget(origin) {
+  const raw = String(origin || '').trim()
+  if (!raw) return ''
+  try {
+    return new URL(raw).origin
+  } catch {
+    return raw.replace(/\/geoserver\/?$/i, '')
+  }
+}
+
 function stripOrigin(proxy) {
   proxy.on('proxyReq', (proxyReq) => {
     proxyReq.removeHeader('origin')
@@ -62,7 +73,11 @@ function configureLlmProxy(proxy) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiTarget = env.VITE_API_TARGET
-  const geoserverTarget = env.VITE_GEOSERVER_TARGET
+  const llmTarget = env.VITE_LLM_API_TARGET
+  const geoserverTarget = geoserverProxyTarget(env.VITE_GEOSERVER_ORIGIN)
+  // 仅开发代理使用，不要加 VITE_ 前缀，避免打进前端包
+  const geoserverUser = env.GEOSERVER_USER || ''
+  const geoserverPassword = env.GEOSERVER_PASSWORD || ''
 
   const proxy = {}
   if (apiTarget) {
@@ -73,25 +88,30 @@ export default defineConfig(({ mode }) => {
       configure: stripOrigin,
     }
   }
-  // /v1 暂改直连：浏览器请求 VITE_LLM_API_BASE（绝对地址），不走下方代理。
-  // const llmTarget = env.VITE_LLM_API_TARGET
-  // if (llmTarget) {
-  //   proxy['/v1'] = {
-  //     target: llmTarget,
-  //     changeOrigin: true,
-  //     secure: false,
-  //     timeout: 0,
-  //     proxyTimeout: 0,
-  //     configure: configureLlmProxy,
-  //   }
-  // }
-  // /geoserver → http://10.202.210.30:8090/geoserver
+  if (llmTarget) {
+    proxy['/v1'] = {
+      target: llmTarget,
+      changeOrigin: true,
+      secure: false,
+      timeout: 0,
+      proxyTimeout: 0,
+      configure: configureLlmProxy,
+    }
+  }
+  // /geoserver → VITE_GEOSERVER_ORIGIN（默认 http://10.202.210.30:32860/geoserver）
   if (geoserverTarget) {
     proxy['/geoserver'] = {
       target: geoserverTarget,
       changeOrigin: true,
       secure: false,
-      configure: stripOrigin,
+      configure(proxyServer) {
+        stripOrigin(proxyServer)
+        if (!geoserverUser) return
+        const basic = Buffer.from(`${geoserverUser}:${geoserverPassword}`).toString('base64')
+        proxyServer.on('proxyReq', (proxyReq) => {
+          proxyReq.setHeader('Authorization', `Basic ${basic}`)
+        })
+      },
     }
   }
 

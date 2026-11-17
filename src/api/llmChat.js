@@ -86,11 +86,96 @@ export function parseWorkflowRunMessage(content) {
   }
 }
 
-/** 写入会话：运行输出列表 */
-export function serializeWorkflowOutputsMessage(files) {
+/** 会话落库时保留的上传回调 / 展示字段 */
+const WORKFLOW_OUTPUT_KEYS = [
+  'id',
+  'name',
+  'originalName',
+  'ext',
+  'nodeId',
+  'nodeName',
+  'url',
+  'sourceUrl',
+  'value',
+  'display',
+  'fileUrl',
+  'previewUrl',
+  'mapUrl',
+  'wmsUrl',
+  'publishStatus',
+  'publishMessage',
+  'fileSize',
+  'relativePath',
+  'revision',
+  'datasetId',
+  'projectId',
+  'uploadOk',
+  'error',
+  'serverFile',
+]
+
+function pickWorkflowOutputFile(file, importHit = null) {
+  if (!file || typeof file !== 'object') return null
+  const next = {}
+  WORKFLOW_OUTPUT_KEYS.forEach((key) => {
+    if (file[key] !== undefined) next[key] = file[key]
+  })
+  const server =
+    (file.serverFile && typeof file.serverFile === 'object' ? file.serverFile : null) ||
+    (importHit && typeof importHit === 'object' ? importHit : null)
+  if (server) {
+    if (server.id != null) next.id = String(server.id)
+    if (server.fileUrl) next.fileUrl = server.fileUrl
+    if (server.previewUrl) next.previewUrl = server.previewUrl
+    if (server.mapUrl) next.mapUrl = server.mapUrl
+    next.wmsUrl = server.wmsUrl || server.metadata?.wmsUrl || next.wmsUrl || ''
+    if (server.publishStatus) next.publishStatus = server.publishStatus
+    if (server.publishMessage) next.publishMessage = server.publishMessage
+    if (server.originalName) next.originalName = server.originalName
+    if (server.ext) next.ext = String(server.ext).toLowerCase().replace(/^\./, '')
+    if (server.fileSize != null) next.fileSize = server.fileSize
+    if (server.relativePath) next.relativePath = server.relativePath
+    if (server.revision != null) next.revision = server.revision
+    if (server.datasetId != null) next.datasetId = String(server.datasetId)
+    if (server.projectId != null) next.projectId = String(server.projectId)
+    next.serverFile = server
+    next.uploadOk = true
+    next.error = ''
+  }
+  if (!next.name && next.originalName) next.name = next.originalName
+  return next
+}
+
+function collectImportsFromFiles(files) {
+  const list = []
+  const seen = new Set()
+  ;(Array.isArray(files) ? files : []).forEach((file) => {
+    const server = file?.serverFile
+    if (!server || typeof server !== 'object') return
+    const key = server.id != null ? String(server.id) : JSON.stringify(server)
+    if (seen.has(key)) return
+    seen.add(key)
+    list.push(server)
+  })
+  return list
+}
+
+/**
+ * 写入会话：运行输出 + imports 接口回调。
+ * @param {object[]|{ files?: object[], imports?: object[] }} input
+ */
+export function serializeWorkflowOutputsMessage(input) {
+  const files = Array.isArray(input) ? input : Array.isArray(input?.files) ? input.files : []
+  const imports = Array.isArray(input?.imports)
+    ? input.imports
+    : Array.isArray(files?.imports)
+      ? files.imports
+      : collectImportsFromFiles(files)
+  const list = files.map((file) => pickWorkflowOutputFile(file)).filter(Boolean)
   return JSON.stringify({
     type: 'workflow_outputs',
-    files: Array.isArray(files) ? files : [],
+    files: list,
+    imports,
   })
 }
 
@@ -100,7 +185,21 @@ export function parseWorkflowOutputsMessage(content) {
   try {
     const parsed = JSON.parse(raw)
     if (parsed?.type !== 'workflow_outputs') return null
-    return Array.isArray(parsed.files) ? parsed.files : []
+    const files = Array.isArray(parsed.files) ? parsed.files : []
+    const imports = Array.isArray(parsed.imports) ? parsed.imports : []
+    let importIndex = 0
+    return files
+      .map((file) => {
+        if (file?.serverFile) return pickWorkflowOutputFile(file)
+        // 按有 url 的输出顺序回填 imports 回调
+        if (file?.url || file?.sourceUrl || file?.fileUrl) {
+          const hit = imports[importIndex] || null
+          importIndex += 1
+          return pickWorkflowOutputFile(file, hit)
+        }
+        return pickWorkflowOutputFile(file)
+      })
+      .filter(Boolean)
   } catch {
     return null
   }

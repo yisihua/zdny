@@ -222,14 +222,58 @@ export function collectAlgorithmOuts(algorithm) {
   })
 }
 
+function baseName(pathOrName) {
+  const text = String(pathOrName || '').split('?')[0]
+  const parts = text.split(/[/\\]/)
+  return parts[parts.length - 1] || text
+}
+
 function matchProjectFile(projectFiles, out) {
   const name = out.name
+  const fromUrl = baseName(out.url || out.sourceUrl || out.originalName)
   return (
     projectFiles.find((item) => item?.originalName === name) ||
+    projectFiles.find((item) => fromUrl && item?.originalName === fromUrl) ||
     projectFiles.find((item) => String(item?.relativePath || '').endsWith(`/${name}`)) ||
+    projectFiles.find((item) => fromUrl && String(item?.relativePath || '').endsWith(`/${fromUrl}`)) ||
     projectFiles.find((item) => String(item?.relativePath || '') === name) ||
     null
   )
+}
+
+/** 把 imports 回调 ProjectFile 合并进输出项 */
+export function applyImportResult(out, matched) {
+  if (!out?.url) return out
+  if (!matched) {
+    return {
+      ...out,
+      uploadOk: false,
+      error: out.error || '未匹配到入库文件',
+    }
+  }
+  const wmsUrl = matched.wmsUrl || matched.metadata?.wmsUrl || ''
+  return {
+    ...out,
+    id: matched.id != null ? String(matched.id) : out.id,
+    originalName: matched.originalName || out.originalName,
+    name: matched.originalName || out.name,
+    ext: String(matched.ext || out.ext || '').toLowerCase().replace(/^\./, ''),
+    sourceUrl: out.sourceUrl || toImportFilePath(out.url),
+    previewUrl: matched.previewUrl || '',
+    fileUrl: matched.fileUrl || '',
+    mapUrl: matched.mapUrl || '',
+    wmsUrl,
+    publishStatus: matched.publishStatus || '',
+    publishMessage: matched.publishMessage || '',
+    fileSize: matched.fileSize ?? out.fileSize,
+    relativePath: matched.relativePath || '',
+    revision: matched.revision ?? null,
+    datasetId: matched.datasetId != null ? String(matched.datasetId) : '',
+    projectId: matched.projectId != null ? String(matched.projectId) : '',
+    serverFile: matched,
+    uploadOk: true,
+    error: '',
+  }
 }
 
 function collectConflictInfo(value, ids, revisions) {
@@ -294,10 +338,12 @@ function dropFilePathsByRevision(filePaths, revisions) {
 
 /**
  * 列出各算法输出；有 url 的按 http://10.202.210.30:32862 + 真实路径 提交 filePaths。
+ * onProgress 与数据集文件上传一致：{ percent, phase: 'upload' | 'processing' | 'done' }。
  */
 export async function uploadAlgorithmOutsToDataset(
   algorithm,
   datasetId = WORKFLOW_RESULT_DATASET_ID,
+  { onProgress, signal } = {},
 ) {
   const listed = collectAlgorithmOuts(algorithm)
   const withUrl = listed.filter((item) => item.url)
@@ -308,7 +354,9 @@ export async function uploadAlgorithmOutsToDataset(
     try {
       uploaded = await importDatasetByFilePaths(datasetId, {
         filePaths,
-        overwrite: false,
+        overwrite: true,
+        onProgress,
+        signal,
       })
     } catch (error) {
       if (error?.code === 409) {
@@ -326,6 +374,8 @@ export async function uploadAlgorithmOutsToDataset(
           filePaths: retryPaths,
           overwrite: true,
           expectedRevisions,
+          onProgress,
+          signal,
         })
       } else {
         console.warn('[workflow-outputs] upload failed', error)
@@ -338,16 +388,32 @@ export async function uploadAlgorithmOutsToDataset(
     }
   }
 
+  // 文档：filePaths 按提交顺序返回 ProjectFile[]
   const projectFiles = Array.isArray(uploaded) ? uploaded : uploaded ? [uploaded] : []
+  const used = new Set()
+  let urlIndex = 0
 
-  return listed.map((out) => {
+  const files = listed.map((out) => {
     if (!out.url) return out
     const importUrl = toImportFilePath(out.url)
-    const matched =
-      matchProjectFile(projectFiles, out) ||
-      projectFiles.find((item) => String(item?.originalName || '') === out.name) ||
-      null
+    const byOrder = projectFiles[urlIndex]
+    urlIndex += 1
+    let matched = null
+    if (byOrder && !used.has(byOrder)) {
+      matched = byOrder
+    } else {
+      matched = matchProjectFile(
+        projectFiles.filter((item) => !used.has(item)),
+        { ...out, sourceUrl: importUrl },
+      )
+    }
+    if (matched) used.add(matched)
     if (!matched) {
+      console.warn('[workflow-outputs] import 未匹配', {
+        name: out.name,
+        importUrl,
+        returned: projectFiles.map((item) => item?.originalName),
+      })
       return {
         ...out,
         sourceUrl: importUrl,
@@ -355,17 +421,10 @@ export async function uploadAlgorithmOutsToDataset(
         error: projectFiles.length ? '未匹配到入库文件' : '上传未返回文件',
       }
     }
-    return {
-      ...out,
-      id: matched.id ? String(matched.id) : out.id,
-      originalName: matched.originalName || out.originalName,
-      name: matched.originalName || out.name,
-      ext: String(matched.ext || out.ext || '').toLowerCase().replace(/^\./, ''),
-      sourceUrl: importUrl,
-      previewUrl: matched.previewUrl || '',
-      fileUrl: matched.fileUrl || '',
-      uploadOk: true,
-      error: '',
-    }
+    return applyImportResult({ ...out, sourceUrl: importUrl }, matched)
   })
+
+  // 挂上原始 imports 回调，会话落库时整包保存
+  files.imports = projectFiles
+  return files
 }

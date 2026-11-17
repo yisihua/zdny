@@ -84,8 +84,15 @@ function publishLabel(row) {
   return status
 }
 
+function fileWmsUrl(row) {
+  if (row?.wmsUrl) return String(row.wmsUrl)
+  const meta = row?.metadata
+  if (meta && typeof meta === 'object' && meta.wmsUrl) return String(meta.wmsUrl)
+  return ''
+}
+
 function hasMapUrl(row) {
-  return Boolean(row?.mapUrl)
+  return Boolean(fileWmsUrl(row) || row?.mapUrl)
 }
 
 function onLoadMap(row) {
@@ -93,7 +100,8 @@ function onLoadMap(row) {
   openMap({
     fileName: row.originalName || row.relativePath || String(row.id),
     ext: String(row.ext || 'TIF').toUpperCase(),
-    mapUrl: row.mapUrl,
+    mapUrl: row.mapUrl || '',
+    wmsUrl: fileWmsUrl(row),
   })
 }
 

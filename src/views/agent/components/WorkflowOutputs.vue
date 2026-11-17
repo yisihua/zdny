@@ -13,6 +13,25 @@ import { toProxiedArtifactUrl } from '@/api/workflowOutputs'
 import { useMapPanel } from '@/components/map/context.js'
 import { t } from '@/i18n'
 
+function isGeoJsonFile(file) {
+  const ext = fileExt(file)
+  if (ext === 'geojson') return true
+  // 名称或路径带 .geojson 时也按矢量预览（避免入库后 ext 异常）
+  const name = String(file?.originalName || file?.name || file?.relativePath || '').toLowerCase()
+  return name.endsWith('.geojson')
+}
+
+async function fetchJsonWithAuth(url) {
+  const raw = String(url || '').trim()
+  if (!raw) throw new Error('缺少预览地址')
+  const token = localStorage.getItem('token')
+  const response = await fetch(raw, {
+    headers: raw.startsWith('/api/') && token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!response.ok) throw new Error(`预览失败（${response.status}）`)
+  return response.json()
+}
+
 const props = defineProps({
   files: { type: Array, default: () => [] },
 })
@@ -42,6 +61,23 @@ const previewTableRows = computed(() => {
 
 function hasFileUrl(file) {
   return Boolean(file?.url || file?.sourceUrl || file?.fileUrl || file?.previewUrl)
+}
+
+function fileWmsUrl(file) {
+  if (file?.wmsUrl) return String(file.wmsUrl)
+  const server = file?.serverFile
+  if (server?.wmsUrl) return String(server.wmsUrl)
+  const meta = file?.metadata || server?.metadata
+  if (meta && typeof meta === 'object' && meta.wmsUrl) return String(meta.wmsUrl)
+  return ''
+}
+
+function canOpenOnMap(file) {
+  return Boolean(fileWmsUrl(file) || file?.mapUrl || file?.serverFile?.mapUrl)
+}
+
+function isRasterMapExt(file) {
+  return ['tif', 'tiff', 'geotiff'].includes(fileExt(file))
 }
 
 function fileBadge(file) {
@@ -85,16 +121,48 @@ function togglePreviewAll() {
   preview.value.showAll = !preview.value.showAll
 }
 
+/** GeoJSON：保持原模式，拉取 JSON 后矢量绘制到地图（不走 WMS） */
 async function previewGeoJsonOnMap(file) {
-  const proxied = withProxiedFetchUrl(file)
-  const url = proxied.previewUrl || proxied.sourceUrl || proxied.url
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`预览失败（${response.status}）`)
-  const data = await response.json()
+  const artifactUrl = toProxiedArtifactUrl(file.sourceUrl || file.url || '')
+  const datasetUrl = [file.previewUrl, file.fileUrl, file.serverFile?.previewUrl, file.serverFile?.fileUrl]
+    .map((item) => String(item || '').trim())
+    .find((item) => item.startsWith('/api/'))
+  const candidates = [artifactUrl, datasetUrl].filter(Boolean)
+  if (!candidates.length) throw new Error('缺少预览地址')
+
+  let data = null
+  let lastError = null
+  for (const url of candidates) {
+    try {
+      data = await fetchJsonWithAuth(url)
+      break
+    } catch (error) {
+      lastError = error
+    }
+  }
+  if (!data) throw lastError || new Error('预览失败')
+
   openMap({
     fileName: file.originalName || file.name || 'geojson',
     ext: 'GeoJSON',
     geojson: data,
+    mapUrl: '',
+    wmsUrl: '',
+  })
+}
+
+/** TIF 等栅格：与数据管理「加载到地图」相同，走 GeoServer WMS / mapUrl */
+function previewRasterOnMap(file) {
+  if (!canOpenOnMap(file)) {
+    ElMessage.warning(t('workflow.previewUnsupported'))
+    return
+  }
+  openMap({
+    fileName: file.originalName || file.name || String(file.id),
+    ext: String(file.ext || file.serverFile?.ext || 'TIF').toUpperCase(),
+    mapUrl: file.mapUrl || file.serverFile?.mapUrl || '',
+    wmsUrl: fileWmsUrl(file),
+    geojson: null,
   })
 }
 
@@ -104,8 +172,13 @@ async function onPreview(file) {
   try {
     closePreview()
     const ext = fileExt(file)
-    if (ext === 'geojson') {
+    // geojson 始终矢量上图；tif 才走 WMS
+    if (isGeoJsonFile(file)) {
       await previewGeoJsonOnMap(file)
+      return
+    }
+    if (isRasterMapExt(file)) {
+      previewRasterOnMap(file)
       return
     }
     if (!canPreviewFile(file) && !['json'].includes(ext)) {

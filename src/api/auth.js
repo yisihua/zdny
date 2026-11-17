@@ -8,6 +8,10 @@ export function login(body) {
   return request.post('/auth/login', body)
 }
 
+export function registerAccount(body) {
+  return request.post('/auth/register', body)
+}
+
 export function getCurrentUser() {
   return request.get('/users/me')
 }

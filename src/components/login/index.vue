@@ -2,25 +2,35 @@
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowRight, Lock, RefreshRight, User } from '@element-plus/icons-vue'
+import { ArrowRight, Lock, Message, RefreshRight, User } from '@element-plus/icons-vue'
 import LangSwitch from '@/components/LangSwitch.vue'
-import { forgotPassword, getCaptcha, getCurrentUser, login, resetPassword } from '@/api/auth'
+import {
+  forgotPassword,
+  getCaptcha,
+  getCurrentUser,
+  login,
+  registerAccount,
+  resetPassword,
+} from '@/api/auth'
 import { locale, t } from '@/i18n'
 import { sanitizeRedirect } from '@/router/redirect'
 
 const router = useRouter()
 const route = useRoute()
 const formRef = ref()
+const registerFormRef = ref()
 const forgotFormRef = ref()
 const resetFormRef = ref()
 const docVisible = ref(false)
 const docKey = ref('')
+const registerVisible = ref(false)
 const forgotVisible = ref(false)
 const forgotStep = ref('verify')
 const submitting = ref(false)
 const captchaLoading = ref(false)
 const forgotCaptchaLoading = ref(false)
 const resetToken = ref('')
+const usernamePattern = /^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/
 const serverCaptcha = reactive({
   id: '',
   image: '',
@@ -28,6 +38,15 @@ const serverCaptcha = reactive({
 const forgotCaptcha = reactive({
   id: '',
   image: '',
+})
+
+const registerForm = reactive({
+  username: '',
+  password: '',
+  confirmPassword: '',
+  email: '',
+  securityQuestion: '',
+  securityAnswer: '',
 })
 
 const forgotForm = reactive({
@@ -68,6 +87,92 @@ const rules = computed(() => ({
   username: [{ required: true, message: t('login.userRequired'), trigger: 'blur' }],
   password: [{ required: true, message: t('login.passwordRequired'), trigger: 'blur' }],
   captcha: [{ required: true, message: t('login.captchaRequired'), trigger: 'blur' }],
+}))
+
+const registerRules = computed(() => ({
+  username: [
+    { required: true, message: t('login.userRequired'), trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        if (!usernamePattern.test(String(value || '').trim())) {
+          callback(new Error(t('login.usernameRule')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  password: [
+    { required: true, message: t('login.passwordRequired'), trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        const password = String(value || '')
+        if (password.length < 8 || password.length > 72 || new TextEncoder().encode(password).length > 72) {
+          callback(new Error(t('login.passwordRule')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  confirmPassword: [
+    { required: true, message: t('login.passwordConfirm'), trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        if (value !== registerForm.password) {
+          callback(new Error(t('login.passwordMismatch')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  email: [
+    {
+      validator: (_rule, value, callback) => {
+        const email = String(value || '').trim()
+        if (!email) {
+          callback()
+          return
+        }
+        if (email.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          callback(new Error(t('login.emailBad')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  securityQuestion: [
+    { required: true, message: t('login.securityQuestionRequired'), trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        if (String(value || '').trim().length > 128) {
+          callback(new Error(t('login.fieldLong')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  securityAnswer: [
+    { required: true, message: t('login.securityAnswerRequired'), trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) => {
+        if (String(value || '').trim().length > 128) {
+          callback(new Error(t('login.fieldLong')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
 }))
 
 const forgotRules = computed(() => ({
@@ -285,8 +390,46 @@ async function submitReset() {
   }
 }
 
-function onRegister() {
-  ElMessage.info(t('login.registerTip'))
+function openRegister() {
+  registerForm.username = form.username.trim()
+  registerForm.password = ''
+  registerForm.confirmPassword = ''
+  registerForm.email = ''
+  registerForm.securityQuestion = ''
+  registerForm.securityAnswer = ''
+  registerVisible.value = true
+}
+
+function closeRegister() {
+  registerVisible.value = false
+  registerFormRef.value?.resetFields?.()
+}
+
+async function submitRegister() {
+  const valid = await registerFormRef.value?.validate().catch(() => false)
+  if (!valid || submitting.value) return
+
+  const email = registerForm.email.trim()
+  const body = {
+    username: registerForm.username.trim(),
+    password: registerForm.password,
+    securityQuestion: registerForm.securityQuestion.trim(),
+    securityAnswer: registerForm.securityAnswer.trim(),
+  }
+  if (email) body.email = email
+
+  submitting.value = true
+  try {
+    await registerAccount(body)
+    form.username = body.username
+    ElMessage.success(t('login.registerOk'))
+    closeRegister()
+    await loadCaptcha()
+  } catch {
+    // 错误提示由请求层展示
+  } finally {
+    submitting.value = false
+  }
 }
 
 function openDoc(key) {
@@ -408,13 +551,109 @@ loadCaptcha()
           </button>
 
           <div class="action-row">
-            <button type="button" class="ghost" @click="onRegister">{{ t('login.register') }}</button>
+            <button type="button" class="ghost" @click="openRegister">{{ t('login.register') }}</button>
             <button type="button" class="ghost" @click="openForgot">{{ t('login.forgot') }}</button>
           </div>
         </el-form>
 
         <el-dialog v-model="docVisible" :title="t(docKey === 'privacy' ? 'login.privacy' : 'login.service')" width="480px" append-to-body>
           <p class="doc-text">{{ t(docKey === 'privacy' ? 'login.privacyText' : 'login.serviceText') }}</p>
+        </el-dialog>
+
+        <el-dialog
+          v-model="registerVisible"
+          class="login-dialog"
+          modal-class="login-dialog-modal"
+          :title="t('login.registerTitle')"
+          width="480px"
+          append-to-body
+          destroy-on-close
+          align-center
+          @closed="closeRegister"
+        >
+          <el-form
+            ref="registerFormRef"
+            class="login-form"
+            :model="registerForm"
+            :rules="registerRules"
+            label-position="top"
+            @submit.prevent="submitRegister"
+          >
+            <el-form-item :label="t('login.user')" prop="username" required>
+              <el-input
+                v-model="registerForm.username"
+                maxlength="64"
+                :placeholder="t('login.user')"
+                autocomplete="username"
+              >
+                <template #prefix>
+                  <el-icon><User /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item :label="t('login.password')" prop="password" required>
+              <el-input
+                v-model="registerForm.password"
+                type="password"
+                show-password
+                maxlength="72"
+                :placeholder="t('login.password')"
+                autocomplete="new-password"
+              >
+                <template #prefix>
+                  <el-icon><Lock /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item :label="t('login.passwordConfirm')" prop="confirmPassword" required>
+              <el-input
+                v-model="registerForm.confirmPassword"
+                type="password"
+                show-password
+                maxlength="72"
+                :placeholder="t('login.passwordConfirm')"
+                autocomplete="new-password"
+              >
+                <template #prefix>
+                  <el-icon><Lock /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item :label="t('login.email')" prop="email">
+              <el-input
+                v-model="registerForm.email"
+                maxlength="128"
+                :placeholder="t('login.email')"
+                autocomplete="email"
+              >
+                <template #prefix>
+                  <el-icon><Message /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item :label="t('login.securityQuestion')" prop="securityQuestion" required>
+              <el-input
+                v-model="registerForm.securityQuestion"
+                maxlength="128"
+                :placeholder="t('login.securityQuestionPh')"
+                autocomplete="off"
+              />
+            </el-form-item>
+            <el-form-item :label="t('login.securityAnswer')" prop="securityAnswer" required>
+              <el-input
+                v-model="registerForm.securityAnswer"
+                maxlength="128"
+                :placeholder="t('login.securityAnswer')"
+                autocomplete="off"
+              />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <button type="button" class="ghost" @click="closeRegister">{{ t('login.cancel') }}</button>
+            <button type="button" class="primary" :disabled="submitting" @click="submitRegister">
+              {{ t('login.registerSubmit') }}
+            </button>
+          </template>
         </el-dialog>
 
         <el-dialog

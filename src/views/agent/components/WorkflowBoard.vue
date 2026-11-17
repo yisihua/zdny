@@ -14,6 +14,9 @@ const emit = defineEmits(['run-start', 'outputs'])
 
 const starting = ref(false)
 const uploadingOuts = ref(false)
+const uploadProgress = ref(0)
+const uploadPhase = ref('')
+const uploadCount = ref(0)
 const eventId = ref('')
 let abortCtrl = null
 
@@ -59,6 +62,11 @@ const runLabel = computed(() => {
   if (phase.value === 'running') return t('workflow.running')
   return t('workflow.start')
 })
+const uploadPhaseText = computed(() => {
+  if (uploadPhase.value === 'processing') return t('data.uploadProcessing')
+  if (uploadPhase.value === 'done') return t('data.uploadDone')
+  return t('data.uploadProgress', { n: uploadProgress.value })
+})
 
 function resetNode(node) {
   if (!node) return
@@ -97,15 +105,21 @@ function syncNode(local, remote) {
   })
 }
 
+function onUploadProgress(event) {
+  uploadPhase.value = event?.phase || 'upload'
+  uploadProgress.value = Number(event?.percent) || 0
+}
+
 async function publishOutputs(root) {
   if (uploadingOuts.value) return
   uploadingOuts.value = true
+  uploadProgress.value = 0
+  uploadPhase.value = 'upload'
+  uploadCount.value = collectAlgorithmOuts(root).filter((item) => item.url).length
   try {
-    const pending = collectAlgorithmOuts(root)
-    if (pending.length) {
-      ElMessage.info(t('workflow.uploadingOuts', { n: pending.length }))
-    }
-    const files = await uploadAlgorithmOutsToDataset(root)
+    const files = await uploadAlgorithmOutsToDataset(root, undefined, {
+      onProgress: onUploadProgress,
+    })
     if (!files.length) {
       ElMessage.info(t('workflow.outputsEmpty'))
       return
@@ -116,6 +130,9 @@ async function publishOutputs(root) {
     ElMessage.error(error?.message || t('workflow.uploadOutsFailed'))
   } finally {
     uploadingOuts.value = false
+    uploadPhase.value = ''
+    uploadProgress.value = 0
+    uploadCount.value = 0
   }
 }
 
@@ -200,6 +217,22 @@ onBeforeUnmount(stop)
         <button type="button" class="run" :disabled="phase !== 'idle'" @click="start">{{ runLabel }}</button>
       </div>
     </header>
+    <div v-if="uploadingOuts && uploadCount" class="upload-progress">
+      <div class="upload-progress-head">
+        <strong>{{ t('workflow.uploadingOuts', { n: uploadCount }) }}</strong>
+        <p>{{ uploadPhaseText }}</p>
+        <em>{{ uploadProgress }}%</em>
+      </div>
+      <div
+        class="upload-bar"
+        role="progressbar"
+        :aria-valuenow="uploadProgress"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
+        <i :style="{ width: `${uploadProgress}%` }" />
+      </div>
+    </div>
     <div class="canvas">
       <div class="paper">
         <WorkflowNode :node="group.algorithm" />
@@ -300,6 +333,68 @@ small {
 .tools button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.upload-progress {
+  display: grid;
+  gap: 8px;
+  margin: 0 16px 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 200, 230, 0.45);
+  border-radius: 12px;
+  background: rgba(8, 32, 24, 0.88);
+}
+
+.upload-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: baseline;
+}
+
+.upload-progress-head strong {
+  font-size: 13px;
+}
+
+.upload-progress-head p {
+  flex: 1;
+  min-width: 0;
+  color: rgba(214, 245, 228, 0.68);
+  font-size: 12px;
+}
+
+.upload-progress-head em {
+  flex: 0 0 auto;
+  color: #8dffc8;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.upload-bar {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(140, 220, 175, 0.16);
+}
+
+.upload-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5ec8e8, #8cf0ae 45%, #2fbf6a);
+  background-size: 200% 100%;
+  animation: upload-shine 1.2s linear infinite;
+  transition: width 0.2s ease;
+}
+
+@keyframes upload-shine {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .canvas {
