@@ -68,11 +68,13 @@ export async function streamAgentRun({ algorithm, signal, onEvent }) {
 
   const url = `${llmBase()}/agent-runs`
   const body = JSON.stringify({ algorithm: payload })
+  const token = localStorage.getItem('token')
   const headers = {
     Accept: 'text/event-stream',
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
   }
+  if (token) headers.Authorization = `Bearer ${token}`
 
   log('request', {
     url,

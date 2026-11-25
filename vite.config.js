@@ -1,5 +1,4 @@
 import { fileURLToPath, URL } from 'node:url'
-import basicSsl from '@vitejs/plugin-basic-ssl'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig, loadEnv } from 'vite'
 import posts from './src/mock/posts.js'
@@ -116,19 +115,17 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [vue(), basicSsl(), mockApi()],
+    plugins: [vue(), mockApi()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
     server: {
-      https: true,
       port: 5173,
       proxy: Object.keys(proxy).length ? proxy : undefined,
     },
     preview: {
-      https: true,
       port: 4173,
       proxy: Object.keys(proxy).length ? proxy : undefined,
     },

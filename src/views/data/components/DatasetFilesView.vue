@@ -9,6 +9,7 @@ import {
   deleteDatasetFile,
   downloadDatasetFile,
   fetchDatasetFiles,
+  fileExt,
   previewDatasetFile,
 } from '@/api/dataset'
 import { useMapPanel } from '@/components/map/context.js'
@@ -29,6 +30,7 @@ const total = ref(0)
 const loading = ref(false)
 const downloadingId = ref('')
 const previewingId = ref('')
+const loadingMapId = ref('')
 const files = ref([])
 const preview = ref({
   open: false,
@@ -95,13 +97,57 @@ function hasMapUrl(row) {
   return Boolean(fileWmsUrl(row) || row?.mapUrl)
 }
 
-function onLoadMap(row) {
+function isGeoJsonFile(row) {
+  if (fileExt(row) === 'geojson') return true
+  const name = String(row?.originalName || row?.name || row?.relativePath || '').toLowerCase()
+  return name.endsWith('.geojson')
+}
+
+function canLoadToMap(row) {
+  if (hasMapUrl(row)) return true
+  return isGeoJsonFile(row) && Boolean(row?.previewUrl || row?.fileUrl)
+}
+
+async function fetchJsonWithAuth(url) {
+  const raw = String(url || '').trim()
+  if (!raw) throw new Error('缺少文件地址')
+  const token = localStorage.getItem('token')
+  const response = await fetch(raw, {
+    headers: raw.startsWith('/api/') && token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!response.ok) throw new Error(`加载失败（${response.status}）`)
+  return response.json()
+}
+
+/** GeoJSON：拉取 JSON 后矢量上图；TIF 等：走 WMS / mapUrl */
+async function onLoadMap(row) {
+  if (isGeoJsonFile(row)) {
+    if (loadingMapId.value) return
+    loadingMapId.value = String(row.id)
+    try {
+      const url = row.previewUrl || row.fileUrl
+      const data = await fetchJsonWithAuth(url)
+      openMap({
+        fileName: row.originalName || row.relativePath || String(row.id),
+        ext: 'GeoJSON',
+        geojson: data,
+        mapUrl: '',
+        wmsUrl: '',
+      })
+    } catch (error) {
+      if (error?.message) ElMessage.error(error.message)
+    } finally {
+      loadingMapId.value = ''
+    }
+    return
+  }
   if (!hasMapUrl(row)) return
   openMap({
     fileName: row.originalName || row.relativePath || String(row.id),
     ext: String(row.ext || 'TIF').toUpperCase(),
     mapUrl: row.mapUrl || '',
     wmsUrl: fileWmsUrl(row),
+    geojson: null,
   })
 }
 
@@ -262,9 +308,10 @@ defineExpose({ reload: loadFiles })
           </div>
           <div class="ops">
             <button
-              v-if="hasMapUrl(row)"
+              v-if="canLoadToMap(row)"
               type="button"
               class="map-btn"
+              :disabled="loadingMapId === String(row.id)"
               @click="onLoadMap(row)"
             >
               <el-icon><MapLocation /></el-icon>{{ t('data.load') }}

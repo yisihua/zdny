@@ -77,10 +77,6 @@ watch(
   padding: 64px 6% 12px;
   overflow: auto;
   scrollbar-gutter: stable;
-  background-image:
-    linear-gradient(rgba(120, 220, 170, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(120, 220, 170, 0.05) 1px, transparent 1px);
-  background-size: 52px 52px, 52px 52px;
 }
 
 .toolbar {

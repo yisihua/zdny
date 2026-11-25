@@ -25,10 +25,32 @@ import {
   streamSessionChat,
 } from '@/api/llmChat'
 import { createPlotForm, plotChoice, plotResult } from './plot.js'
+import {
+  isSessionPinned,
+  pinSessionId,
+  readPinnedSessionIds,
+  removePinnedSessionId,
+  sortSessionsByPinOrder,
+  unpinSessionId,
+  writePinnedSessionIds,
+} from './sessionPins.js'
+import {
+  buildSessionSections,
+  createSessionGroup,
+  deleteSessionGroup,
+  moveSessionToGroup,
+  pruneSessionGroupStore,
+  readSessionGroupStore,
+  removeSessionFromGroups,
+  renameSessionGroup,
+  toggleSessionGroup,
+} from './sessionGroups.js'
 import { t } from '@/i18n'
 import '@/styles/system-dialog.css'
 
 const sessions = ref([])
+const pinnedIds = ref(readPinnedSessionIds())
+const groupStore = ref(readSessionGroupStore())
 const messages = ref([])
 const activeId = ref(null)
 const collapsed = ref(false)
@@ -38,6 +60,22 @@ const loadingMessages = ref(false)
 const sending = ref(false)
 
 const localExtras = ref({})
+
+const sessionSections = computed(() =>
+  buildSessionSections(sessions.value, groupStore.value, pinnedIds.value),
+)
+
+function applySessionOrder(list) {
+  return sortSessionsByPinOrder(list, pinnedIds.value)
+}
+
+function syncPinnedIds(nextIds) {
+  pinnedIds.value = writePinnedSessionIds(nextIds)
+}
+
+function syncGroupStore(next) {
+  groupStore.value = next
+}
 
 const displayMessages = computed(() => {
   const extras = localExtras.value[activeId.value] || []
@@ -109,12 +147,16 @@ async function loadAllSessions() {
       page += 1
     } while (page <= totalPages && page <= 20)
 
-    sessions.value = records.map((item) => ({
+    const mapped = records.map((item) => ({
       id: String(item.id),
       title: item.title || t('agent.newTitle'),
       createdAt: item.createdAt || null,
       updatedAt: item.updatedAt || null,
     }))
+    const alive = new Set(mapped.map((item) => item.id))
+    syncPinnedIds(pinnedIds.value.filter((id) => alive.has(id)))
+    syncGroupStore(pruneSessionGroupStore([...alive], groupStore.value))
+    sessions.value = applySessionOrder(mapped)
 
     if (activeId.value && !sessions.value.some((item) => item.id === activeId.value)) {
       activeId.value = null
@@ -187,7 +229,7 @@ async function createSession() {
       createdAt: data.createdAt || null,
       updatedAt: data.updatedAt || null,
     }
-    sessions.value = [session, ...sessions.value.filter((item) => item.id !== session.id)]
+    sessions.value = applySessionOrder([session, ...sessions.value.filter((item) => item.id !== session.id)])
     activeId.value = session.id
     messages.value = []
     localExtras.value = { ...localExtras.value, [session.id]: [] }
@@ -199,6 +241,88 @@ async function createSession() {
   }
 }
 
+function onPin(session) {
+  if (!session?.id) return
+  if (isSessionPinned(session.id, pinnedIds.value)) {
+    syncPinnedIds(unpinSessionId(session.id))
+  } else {
+    syncPinnedIds(pinSessionId(session.id))
+  }
+  sessions.value = applySessionOrder(sessions.value)
+}
+
+async function onCreateGroup() {
+  try {
+    const { value } = await ElMessageBox.prompt(t('agent.groupCreateTip'), t('agent.groupCreate'), {
+      inputPlaceholder: t('agent.groupName'),
+      confirmButtonText: t('system.save'),
+      cancelButtonText: t('system.cancel'),
+      customClass: 'system-message-box',
+      modalClass: 'system-message-box-modal',
+      inputValidator: (input) => {
+        const name = String(input || '').trim()
+        if (!name) return t('agent.groupNameRequired')
+        if (name.length > 64) return t('agent.groupNameLong')
+        return true
+      },
+    })
+    syncGroupStore(createSessionGroup(value, groupStore.value))
+    ElMessage.success(t('agent.groupCreated'))
+  } catch {
+    // cancelled
+  }
+}
+
+async function onRenameGroup(group) {
+  if (!group?.id) return
+  try {
+    const { value } = await ElMessageBox.prompt(t('agent.groupCreateTip'), t('agent.groupRename'), {
+      inputValue: group.name,
+      inputPlaceholder: t('agent.groupName'),
+      confirmButtonText: t('system.save'),
+      cancelButtonText: t('system.cancel'),
+      customClass: 'system-message-box',
+      modalClass: 'system-message-box-modal',
+      inputValidator: (input) => {
+        const name = String(input || '').trim()
+        if (!name) return t('agent.groupNameRequired')
+        if (name.length > 64) return t('agent.groupNameLong')
+        return true
+      },
+    })
+    syncGroupStore(renameSessionGroup(group.id, value, groupStore.value))
+    ElMessage.success(t('agent.groupRenamed'))
+  } catch {
+    // cancelled
+  }
+}
+
+async function onDeleteGroup(group) {
+  if (!group?.id) return
+  try {
+    await ElMessageBox.confirm(t('agent.groupDeleteConfirm', { name: group.name }), t('agent.groupDelete'), {
+      type: 'warning',
+      customClass: 'system-message-box',
+      modalClass: 'system-message-box-modal',
+      confirmButtonText: t('system.remove'),
+      cancelButtonText: t('system.cancel'),
+    })
+    syncGroupStore(deleteSessionGroup(group.id, groupStore.value))
+    ElMessage.success(t('agent.groupDeleted'))
+  } catch {
+    // cancelled
+  }
+}
+
+function onToggleGroup(groupId) {
+  syncGroupStore(toggleSessionGroup(groupId, groupStore.value))
+}
+
+function onMoveSession({ sessionId, groupId }) {
+  if (!sessionId) return
+  syncGroupStore(moveSessionToGroup(sessionId, groupId, groupStore.value))
+}
+
 async function onRename(session) {
   try {
     const { value } = await ElMessageBox.prompt(t('agent.renameTip'), t('agent.rename'), {
@@ -207,6 +331,7 @@ async function onRename(session) {
       confirmButtonText: t('system.save'),
       cancelButtonText: t('system.cancel'),
       customClass: 'system-message-box',
+      modalClass: 'system-message-box-modal',
       inputValidator: (input) => {
         const title = String(input || '').trim()
         if (!title) return t('agent.renameRequired')
@@ -231,11 +356,14 @@ async function onDelete(session) {
     await ElMessageBox.confirm(t('agent.deleteConfirm', { name: session.title }), t('agent.delete'), {
       type: 'warning',
       customClass: 'system-message-box',
+      modalClass: 'system-message-box-modal',
       confirmButtonText: t('system.remove'),
       cancelButtonText: t('system.cancel'),
     })
     await deleteSessionApi(session.id)
-    sessions.value = sessions.value.filter((item) => item.id !== session.id)
+    syncPinnedIds(removePinnedSessionId(session.id))
+    syncGroupStore(removeSessionFromGroups(session.id, groupStore.value))
+    sessions.value = applySessionOrder(sessions.value.filter((item) => item.id !== session.id))
     const nextExtras = { ...localExtras.value }
     delete nextExtras[session.id]
     localExtras.value = nextExtras
@@ -274,7 +402,7 @@ async function ensureSession(content) {
   if (!sessionId) {
     const created = await createSessionApi({ title: sessionTitleFromContent(content) })
     sessionId = String(created.id)
-    sessions.value = [
+    sessions.value = applySessionOrder([
       {
         id: sessionId,
         title: created.title || sessionTitleFromContent(content),
@@ -282,7 +410,7 @@ async function ensureSession(content) {
         updatedAt: created.updatedAt || null,
       },
       ...sessions.value,
-    ]
+    ])
     activeId.value = sessionId
     messages.value = []
     return sessionId
@@ -540,13 +668,22 @@ onMounted(async () => {
     <WorkbenchSide
       :collapsed="collapsed"
       :sessions="sessions"
+      :sections="sessionSections"
+      :groups="groupStore.groups"
       :active-id="activeId"
+      :pinned-ids="pinnedIds"
       :loading="loadingSessions"
       @toggle="collapsed = !collapsed"
       @create="createSession"
       @select="selectSession"
       @rename="onRename"
       @delete="onDelete"
+      @pin="onPin"
+      @create-group="onCreateGroup"
+      @rename-group="onRenameGroup"
+      @delete-group="onDeleteGroup"
+      @toggle-group="onToggleGroup"
+      @move-session="onMoveSession"
     />
     <section class="chat">
       <ChatStage

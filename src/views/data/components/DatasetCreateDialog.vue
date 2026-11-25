@@ -6,7 +6,7 @@ import {
   createDataset,
   createDatasetShare,
 } from '@/api/dataset'
-import { fetchProjectMembers, fetchProjects, updateProjectSharing } from '@/api/project'
+import { fetchProjects, updateProjectSharing } from '@/api/project'
 import { t } from '@/i18n'
 import '@/styles/system-dialog.css'
 
@@ -29,6 +29,7 @@ const projects = ref([])
 const form = reactive({
   projectId: '',
   name: '',
+  description: '',
   dataType: 'RAW_RGB',
   collectionDate: '',
   batch: '',
@@ -64,6 +65,16 @@ const rules = computed(() => ({
       trigger: 'blur',
     },
   ],
+  description: [
+    {
+      validator: (_rule, value, callback) => {
+        const text = String(value || '')
+        if (text.length > 4000) return callback(new Error(t('data.descriptionLong')))
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
   dataType: [{ required: true, message: t('data.dataTypeRequired'), trigger: 'change' }],
 }))
 
@@ -89,6 +100,7 @@ async function loadProjects() {
 function reset() {
   form.projectId = ''
   form.name = ''
+  form.description = ''
   form.dataType = 'RAW_RGB'
   form.collectionDate = ''
   form.batch = ''
@@ -97,42 +109,12 @@ function reset() {
   formRef.value?.clearValidate?.()
 }
 
-async function shareWithProjectMembers(datasetId, project) {
+async function shareWithProject(datasetId, project) {
   if (!project?.id) throw new Error(t('data.shareNoMembers'))
-
-  const tasks = []
-  if (project.teamId) {
-    tasks.push(
-      createDatasetShare(datasetId, {
-        targetType: 'TEAM',
-        targetId: String(project.teamId),
-      }),
-    )
-  }
-
-  const me = String(localStorage.getItem('userId') || '')
-  const ownerId = String(project.ownerId || '')
-  const memberPage = await fetchProjectMembers(project.id, { page: 1, pageSize: 100 })
-  const members = memberPage?.records || memberPage?.list || []
-  const sharedUsers = new Set()
-  members.forEach((member) => {
-    const userId = String(member.userId || '')
-    if (!userId || userId === me || userId === ownerId || sharedUsers.has(userId)) return
-    sharedUsers.add(userId)
-    tasks.push(
-      createDatasetShare(datasetId, {
-        targetType: 'USER',
-        targetId: userId,
-      }),
-    )
+  await createDatasetShare(datasetId, {
+    targetType: 'PROJECT',
+    targetId: String(project.id),
   })
-
-  if (!tasks.length) throw new Error(t('data.shareNoMembers'))
-
-  const results = await Promise.allSettled(tasks)
-  const failed = results.filter((item) => item.status === 'rejected').length
-  if (failed === results.length) throw new Error(t('data.shareLater'))
-  if (failed) ElMessage.warning(t('data.sharePartial', { ok: results.length - failed, fail: failed }))
 }
 
 async function ensureProjectShareSwitch(project) {
@@ -158,6 +140,7 @@ async function submit() {
 
     const dataset = await createDataset(form.projectId, {
       name: form.name,
+      description: form.description,
       dataType: form.dataType,
       collectionDate: form.collectionDate || null,
       batch: form.batch,
@@ -166,7 +149,7 @@ async function submit() {
 
     if (form.shared) {
       try {
-        await shareWithProjectMembers(dataset.id, project)
+        await shareWithProject(dataset.id, project)
       } catch (error) {
         ElMessage.warning(error?.message || t('data.shareLater'))
       }
@@ -225,7 +208,17 @@ watch(visible, (open) => {
           </el-form-item>
         </div>
         <el-form-item :label="t('data.datasetName')" prop="name">
-          <el-input v-model="form.name" maxlength="256" :placeholder="t('data.datasetNamePh')" />
+          <el-input v-model="form.name" maxlength="256" show-word-limit :placeholder="t('data.datasetNamePh')" />
+        </el-form-item>
+        <el-form-item :label="t('data.description')" prop="description">
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            :rows="3"
+            maxlength="4000"
+            show-word-limit
+            :placeholder="t('data.descriptionPh')"
+          />
         </el-form-item>
       </section>
 

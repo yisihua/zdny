@@ -239,12 +239,16 @@ export async function streamSessionChat({ sessionId, question, attachmentId, sig
   const body = { question: String(question || '').trim() }
   if (attachmentId) body.attachment_id = String(attachmentId)
 
+  const token = localStorage.getItem('token')
+  const headers = {
+    Accept: 'text/event-stream',
+    'Content-Type': 'application/json',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      Accept: 'text/event-stream',
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
     signal,
   })

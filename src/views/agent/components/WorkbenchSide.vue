@@ -5,11 +5,26 @@ import { t } from '@/i18n'
 defineProps({
   collapsed: { type: Boolean, default: false },
   sessions: { type: Array, required: true },
+  sections: { type: Array, default: () => [] },
+  groups: { type: Array, default: () => [] },
   activeId: { type: String, default: null },
+  pinnedIds: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['toggle', 'create', 'select', 'rename', 'delete'])
+const emit = defineEmits([
+  'toggle',
+  'create',
+  'select',
+  'rename',
+  'delete',
+  'pin',
+  'create-group',
+  'rename-group',
+  'delete-group',
+  'toggle-group',
+  'move-session',
+])
 </script>
 
 <template>
@@ -25,11 +40,20 @@ const emit = defineEmits(['toggle', 'create', 'select', 'rename', 'delete'])
       <button type="button" class="create" @click="emit('create')">{{ t('agent.newSession') }}</button>
       <SessionList
         :sessions="sessions"
+        :sections="sections"
+        :groups="groups"
         :active-id="activeId"
+        :pinned-ids="pinnedIds"
         :loading="loading"
         @select="emit('select', $event)"
         @rename="emit('rename', $event)"
         @delete="emit('delete', $event)"
+        @pin="emit('pin', $event)"
+        @create-group="emit('create-group')"
+        @rename-group="emit('rename-group', $event)"
+        @delete-group="emit('delete-group', $event)"
+        @toggle-group="emit('toggle-group', $event)"
+        @move-session="emit('move-session', $event)"
       />
     </template>
   </aside>

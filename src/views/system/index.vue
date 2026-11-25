@@ -7,6 +7,8 @@ import TeamPanel from './components/TeamPanel.vue'
 import ProjectPanel from './components/ProjectPanel.vue'
 import PermissionPanel from './components/PermissionPanel.vue'
 import ServicePanel from './components/ServicePanel.vue'
+import ResourcePanel from './components/ResourcePanel.vue'
+import SessionLogPanel from './components/SessionLogPanel.vue'
 import LogPanel from './components/LogPanel.vue'
 import { createServices } from './data.js'
 
@@ -51,6 +53,8 @@ function removeService(id) {
       @toggle="toggleService"
       @remove="removeService"
     />
+    <ResourcePanel v-else-if="active === 'resource'" />
+    <SessionLogPanel v-else-if="active === 'sessionLog'" />
     <LogPanel v-else-if="active === 'log'" />
   </div>
 </template>

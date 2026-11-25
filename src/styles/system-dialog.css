@@ -122,8 +122,11 @@
 }
 
 .system-dialog .el-input__count,
-.system-dialog .el-input__count-inner {
-  color: rgba(214, 245, 228, 0.48);
+.system-dialog .el-input .el-input__count,
+.system-dialog .el-input__count-inner,
+.system-dialog .el-input .el-input__count .el-input__count-inner,
+.system-dialog .el-textarea .el-input__count {
+  color: rgba(214, 245, 228, 0.62);
   background: transparent;
 }
 
@@ -184,10 +187,18 @@
 }
 
 .system-message-box {
+  --el-messagebox-title-color: #f3fff8;
+  --el-messagebox-content-color: rgba(231, 255, 244, 0.88);
+  --el-bg-color: transparent;
+  padding-bottom: 16px;
   border: 1px solid rgba(140, 220, 175, 0.28);
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(12, 48, 36, 0.96), rgba(5, 24, 18, 0.98));
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
+.system-message-box .el-message-box__header {
+  padding-bottom: 12px;
 }
 
 .system-message-box .el-message-box__title,
@@ -196,15 +207,72 @@
   color: #edfff6;
 }
 
+.system-message-box .el-message-box__title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
 .system-message-box .el-message-box__message {
   color: rgba(231, 255, 244, 0.88);
 }
 
+.system-message-box .el-message-box__container {
+  gap: 8px;
+}
+
+.system-message-box .el-message-box__input {
+  padding-top: 14px;
+}
+
+.system-message-box .el-message-box__input .el-input__wrapper {
+  min-height: 40px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: rgba(3, 18, 14, 0.72);
+  box-shadow: 0 0 0 1px rgba(140, 220, 175, 0.32) inset;
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.system-message-box .el-message-box__input .el-input__wrapper:hover {
+  background: rgba(4, 26, 20, 0.88);
+  box-shadow: 0 0 0 1px rgba(140, 220, 175, 0.48) inset;
+}
+
+.system-message-box .el-message-box__input .el-input__wrapper.is-focus {
+  background: rgba(4, 28, 22, 0.92);
+  box-shadow: 0 0 0 1px #3dce7c inset, 0 0 0 3px rgba(61, 206, 124, 0.16);
+}
+
+.system-message-box .el-message-box__input .el-input__inner {
+  color: #f3fff8;
+  color-scheme: dark;
+}
+
+.system-message-box .el-message-box__input .el-input__inner::placeholder {
+  color: rgba(198, 224, 210, 0.5);
+}
+
+.system-message-box .el-message-box__errormsg {
+  color: #ff9b9b;
+}
+
+.system-message-box .el-message-box__btns {
+  padding-top: 14px;
+}
+
 .system-message-box .el-message-box__btns .el-button {
+  min-width: 88px;
+  height: 36px;
   border-radius: 8px;
   border-color: rgba(140, 220, 175, 0.32);
   color: #f3fff8;
   background: rgba(3, 18, 14, 0.55);
+}
+
+.system-message-box .el-message-box__btns .el-button:hover {
+  border-color: rgba(140, 220, 175, 0.5);
+  color: #edfff6;
+  background: rgba(4, 26, 20, 0.75);
 }
 
 .system-message-box .el-message-box__btns .el-button--primary {
@@ -214,8 +282,24 @@
   font-weight: 700;
 }
 
+.system-message-box .el-message-box__btns .el-button--primary:hover {
+  border: none;
+  color: #042117;
+  background: linear-gradient(90deg, #9af5b8, #38c978);
+  filter: brightness(1.04);
+}
+
 .system-message-box .el-message-box__headerbtn .el-message-box__close {
   color: rgba(214, 245, 228, 0.72);
+}
+
+.system-message-box .el-message-box__headerbtn:hover .el-message-box__close {
+  color: #8dffc8;
+}
+
+.system-message-box-modal {
+  background: rgba(2, 12, 9, 0.72);
+  backdrop-filter: blur(4px);
 }
 
 .system-select-dropdown {

@@ -14,6 +14,8 @@ const items = [
   { id: 'project', key: 'system.project' },
   { id: 'permission', key: 'system.permission' },
   { id: 'service', key: 'system.service' },
+  { id: 'resource', key: 'system.resource' },
+  { id: 'sessionLog', key: 'system.sessionLog' },
   { id: 'log', key: 'system.log' },
 ]
 </script>

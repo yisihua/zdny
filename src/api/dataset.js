@@ -41,9 +41,16 @@ export function fetchDataset(id) {
   return request.get(`/datasets/${id}`)
 }
 
+function normalizeDescription(value) {
+  if (value == null) return null
+  const text = String(value).trim()
+  return text ? text : null
+}
+
 export function createDataset(projectId, body) {
   return request.post(`/projects/${projectId}/datasets`, {
     name: String(body.name || '').trim(),
+    description: normalizeDescription(body.description),
     dataType: body.dataType,
     collectionDate: body.collectionDate || null,
     batch: body.batch ? String(body.batch).trim() : null,
@@ -54,6 +61,7 @@ export function createDataset(projectId, body) {
 export function updateDataset(id, body) {
   return request.put(`/datasets/${id}`, {
     name: String(body.name || '').trim(),
+    description: normalizeDescription(body.description),
     collectionDate: body.collectionDate || null,
     batch: body.batch ? String(body.batch).trim() : null,
     sensor: body.sensor ? String(body.sensor).trim() : null,

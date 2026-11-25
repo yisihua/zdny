@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
-import { sanitizeRedirect } from '@/router/redirect'
 
 const publicAuthPaths = [
   '/auth/captcha',
@@ -48,16 +47,8 @@ function redirectToLogin(message) {
 
   const current = router.currentRoute.value
   const onLogin = current.name === 'login'
-  const redirect = sanitizeRedirect(current.fullPath)
 
-  Promise.resolve(
-    onLogin
-      ? undefined
-      : router.replace({
-          name: 'login',
-          query: redirect ? { redirect } : {},
-        }),
-  ).finally(() => {
+  Promise.resolve(onLogin ? undefined : router.replace({ name: 'login' })).finally(() => {
     window.setTimeout(() => {
       authRedirecting = false
     }, 800)

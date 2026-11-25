@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight, Lock, Message, RefreshRight, User } from '@element-plus/icons-vue'
 import LangSwitch from '@/components/LangSwitch.vue'
@@ -13,10 +13,8 @@ import {
   resetPassword,
 } from '@/api/auth'
 import { locale, t } from '@/i18n'
-import { sanitizeRedirect } from '@/router/redirect'
 
 const router = useRouter()
-const route = useRoute()
 const formRef = ref()
 const registerFormRef = ref()
 const forgotFormRef = ref()
@@ -300,10 +298,7 @@ async function onSubmit() {
     }
 
     ElMessage.success(t('login.ok'))
-    const redirect = sanitizeRedirect(
-      typeof route.query.redirect === 'string' ? route.query.redirect : '',
-    )
-    router.replace(redirect || '/agent')
+    router.replace('/agent')
 
   } catch {
     await loadCaptcha()
